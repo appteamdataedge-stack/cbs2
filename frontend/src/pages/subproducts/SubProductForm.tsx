@@ -39,7 +39,7 @@ const SubProductForm = () => {
     defaultValues: {
       subProductCode: '',
       subProductName: '',
-      productId: 0,
+      productId: undefined, // Don't set to 0, let it be undefined initially
       inttCode: '',
       cumGLNum: '',
       extGLNum: '',
@@ -104,6 +104,7 @@ const SubProductForm = () => {
       navigate(`/subproducts/${data.subProductId}`);
     },
     onError: (error: Error) => {
+      console.error('Create sub-product error:', error);
       toast.error(`Failed to create subproduct: ${error.message}`);
     }
   });
@@ -135,6 +136,29 @@ const SubProductForm = () => {
 
   // Submit handler
   const onSubmit = (data: SubProductRequestDTO) => {
+    // Validate required fields before submission
+    if (!data.productId || data.productId === 0) {
+      alert('Please select a product');
+      return;
+    }
+    
+    if (!data.cumGLNum || data.cumGLNum.trim() === '') {
+      alert('Please select a GL Number');
+      return;
+    }
+    
+    if (!data.inttCode || data.inttCode.trim() === '') {
+      alert('Please enter an Interest Code');
+      return;
+    }
+    
+    if (!data.extGLNum || data.extGLNum.trim() === '') {
+      alert('Please enter an External GL Number');
+      return;
+    }
+    
+    console.log('Submitting sub-product data:', data);
+    
     if (isEdit) {
       updateMutation.mutate(data);
     } else {
@@ -258,13 +282,16 @@ const SubProductForm = () => {
                 <Controller
                   name="inttCode"
                   control={control}
+                  rules={{ required: 'Interest Code is mandatory' }}
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
                       label="Interest Code"
+                      required
+                      error={!!errors.inttCode}
+                      helperText={errors.inttCode?.message || "Interest code for this sub-product"}
                       disabled={isDisabled}
-                      helperText="Interest code for this sub-product"
                     />
                   )}
                 />
@@ -274,13 +301,16 @@ const SubProductForm = () => {
                 <Controller
                   name="extGLNum"
                   control={control}
+                  rules={{ required: 'External GL Number is mandatory' }}
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
                       label="External GL Number"
+                      required
+                      error={!!errors.extGLNum}
+                      helperText={errors.extGLNum?.message || "External GL Number for this sub-product"}
                       disabled={isDisabled}
-                      helperText="External GL Number for this sub-product"
                     />
                   )}
                 />

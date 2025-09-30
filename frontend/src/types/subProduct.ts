@@ -4,9 +4,9 @@
 
 // Enum for sub-product status
 export enum SubProductStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-  DEACTIVE = 'DEACTIVE'
+  ACTIVE = 'Active',
+  INACTIVE = 'Inactive',
+  DEACTIVE = 'Deactive'
 }
 
 // SubProduct request DTO
