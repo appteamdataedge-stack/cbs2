@@ -1,7 +1,7 @@
-import { Add as AddIcon, Edit as EditIcon, Verified as VerifiedIcon } from '@mui/icons-material';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import { Add as AddIcon, Edit as EditIcon, Verified as VerifiedIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Box, IconButton, Tooltip, TextField, InputAdornment } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { getAllProducts, verifyProduct } from '../../api/productService';
@@ -12,7 +12,8 @@ import type { CustomerVerificationDTO, ProductResponseDTO } from '../../types';
 const ProductList = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [sort, setSort] = useState<string | undefined>(undefined);
+  const [, setSort] = useState<string | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState('');
   const [verificationModal, setVerificationModal] = useState<{
     open: boolean;
     productId: number | null;
@@ -21,11 +22,55 @@ const ProductList = () => {
     productId: null,
   });
 
-  // Fetch products
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['products', { page, size: rowsPerPage, sort }],
-    queryFn: () => getAllProducts(page, rowsPerPage, sort),
+  // Fetch all products at once
+  const { data: allProducts, isLoading, error, refetch } = useQuery({
+    queryKey: ['all-products'],
+    queryFn: () => getAllProducts(0, 1000), // Get a large number to effectively get all
+    retry: 3,
+    retryDelay: 1000
   });
+  
+  // Filter products based on search term
+  const filteredProducts = useMemo(() => {
+    if (!allProducts?.content || searchTerm.trim() === '') {
+      return allProducts?.content || [];
+    }
+    
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    
+    return allProducts.content.filter((product) => {
+      // Search in various fields
+      return (
+        product.productName?.toLowerCase().includes(lowerCaseSearch) || 
+        product.productCode?.toLowerCase().includes(lowerCaseSearch) ||
+        String(product.productId).includes(lowerCaseSearch) ||
+        (product.makerId && product.makerId.toLowerCase().includes(lowerCaseSearch)) ||
+        (product.cumGLNum && product.cumGLNum.toLowerCase().includes(lowerCaseSearch))
+      );
+    });
+  }, [allProducts, searchTerm]);
+  
+  // Paginated data for the table
+  const paginatedData = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filteredProducts.slice(startIndex, endIndex);
+  }, [filteredProducts, page, rowsPerPage]);
+  
+  // Reset to first page when search changes
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
+
+  // Handle error if needed
+  if (error) {
+    console.error('Error fetching products:', error);
+  }
+
+  // Handle search input change - dynamic search as user types
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
 
   // Handle sort
   const handleSort = (field: string, direction: 'asc' | 'desc') => {
@@ -66,7 +111,7 @@ const ProductList = () => {
     { id: 'productId', label: 'ID', minWidth: 50, sortable: true },
     { id: 'productCode', label: 'Product Code', minWidth: 120, sortable: true },
     { id: 'productName', label: 'Product Name', minWidth: 200, sortable: true },
-    { id: 'productType', label: 'Product Type', minWidth: 150 },
+    { id: 'cumGLNum', label: 'GL Number', minWidth: 150 },
     { id: 'makerId', label: 'Created By', minWidth: 120 },
     { 
       id: 'entryDate', 
@@ -121,6 +166,39 @@ const ProductList = () => {
         startIcon={<AddIcon />}
       />
 
+      {/* Search Panel - Right aligned */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+        <TextField
+          value={searchTerm}
+          onChange={handleSearchInputChange}
+          placeholder="Search products..."
+          variant="outlined"
+          size="small"
+          sx={{ width: '300px' }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm && (
+              <InputAdornment position="end">
+                <IconButton 
+                  aria-label="clear search"
+                  onClick={() => setSearchTerm('')}
+                  edge="end"
+                  size="small"
+                >
+                  <Tooltip title="Clear search">
+                    <Box component="span" sx={{ display: 'flex' }}>×</Box>
+                  </Tooltip>
+                </IconButton>
+              </InputAdornment>
+            )
+          }}
+        />
+      </Box>
+
       {error ? (
         <ErrorDisplay 
           error={error} 
@@ -130,8 +208,8 @@ const ProductList = () => {
       ) : (
         <DataTable
           columns={columns}
-          rows={data?.content || []}
-          totalItems={data?.totalElements || 0}
+          rows={paginatedData}
+          totalItems={filteredProducts.length}
           page={page}
           rowsPerPage={rowsPerPage}
           onPageChange={setPage}

@@ -25,7 +25,6 @@ export interface ProductResponseDTO {
   productId: number;
   productCode: string;
   productName: string;
-  productType: string;
   cumGLNum: string; // GL Number field
   makerId: string;
   entryDate: string; // LocalDate as ISO string

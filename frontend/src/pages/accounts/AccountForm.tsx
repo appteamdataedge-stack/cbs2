@@ -17,13 +17,14 @@ import {
   TextField
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { createCustomerAccount } from '../../api/customerAccountService';
 import { getAllCustomers } from '../../api/customerService';
 import { getAllSubProducts } from '../../api/subProductService';
+import { getAllProducts } from '../../api/productService';
 import { FormSection, PageHeader } from '../../components/common';
 import type { CustomerAccountRequestDTO, CustomerResponseDTO, SubProductResponseDTO } from '../../types';
 import { CustomerType, SubProductStatus } from '../../types';
@@ -46,6 +47,7 @@ const AccountForm = () => {
   } = useForm<CustomerAccountRequestDTO>({
     defaultValues: {
       custId: 0,
+      productId: 0,
       subProductId: 0,
       accountName: '',
       currency: '',
@@ -59,14 +61,21 @@ const AccountForm = () => {
     queryFn: () => getAllCustomers(0, 100),
   });
 
-  // Get subproducts for dropdown
+  // Get products for dropdown (customer products only)
+  const { data: productsData, isLoading: isLoadingProducts } = useQuery({
+    queryKey: ['customer-products', { page: 0, size: 100 }], // Get customer products for dropdown
+    queryFn: () => getAllProducts(0, 100), // TODO: Replace with getCustomerProducts when API is ready
+  });
+
+  // Get subproducts for dropdown (customer subproducts only)
   const { data: subProductsData, isLoading: isLoadingSubProducts } = useQuery({
-    queryKey: ['subProducts', { page: 0, size: 100 }], // Get all subproducts for dropdown
-    queryFn: () => getAllSubProducts(0, 100),
+    queryKey: ['customer-subproducts', { page: 0, size: 100 }], // Get customer subproducts for dropdown
+    queryFn: () => getAllSubProducts(0, 100), // TODO: Replace with getCustomerSubProducts when API is ready
   });
 
   // Get selected values
   const selectedCustId = watch('custId');
+  const selectedProductId = watch('productId');
   const selectedSubProductId = watch('subProductId');
 
   // Find selected customer and subproduct
@@ -93,7 +102,12 @@ const AccountForm = () => {
     }
   });
 
-  const isLoading = createAccountMutation.isPending || isLoadingCustomers || isLoadingSubProducts;
+  const isLoading = createAccountMutation.isPending || isLoadingCustomers || isLoadingProducts || isLoadingSubProducts;
+
+  // Clear sub-product when product changes
+  useEffect(() => {
+    setValue('subProductId', 0);
+  }, [selectedProductId, setValue]);
 
   // Submit handler
   const onSubmit = (data: CustomerAccountRequestDTO) => {
@@ -177,11 +191,11 @@ const AccountForm = () => {
                 }}
                 render={({ field }) => (
                   <FormControl fullWidth error={!!errors.custId} disabled={isLoading}>
-                    <InputLabel id="customer-label">Customer</InputLabel>
+                    <InputLabel id="customer-label">Primary Cust Id</InputLabel>
                     <Select
                       {...field}
                       labelId="customer-label"
-                      label="Customer"
+                      label="Primary Cust Id"
                       onChange={(e) => {
                         field.onChange(e);
                         generateAccountName();
@@ -203,6 +217,34 @@ const AccountForm = () => {
                       })}
                     </Select>
                     <FormHelperText>{errors.custId?.message}</FormHelperText>
+                  </FormControl>
+                )}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="productId"
+                control={control}
+                rules={{ 
+                  required: 'Product is mandatory',
+                  validate: value => value > 0 || 'Please select a product'
+                }}
+                render={({ field }) => (
+                  <FormControl fullWidth error={!!errors.productId} disabled={isLoading}>
+                    <InputLabel id="product-label">Product Code</InputLabel>
+                    <Select
+                      {...field}
+                      labelId="product-label"
+                      label="Product Code"
+                    >
+                      {productsData?.content.map((product) => (
+                        <MenuItem key={product.productId} value={product.productId}>
+                          {product.productName} ({product.productCode})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <FormHelperText>{errors.productId?.message}</FormHelperText>
                   </FormControl>
                 )}
               />
@@ -235,7 +277,11 @@ const AccountForm = () => {
                       }}
                     >
                       {subProductsData?.content
-                        .filter((sp: SubProductResponseDTO) => sp.subProductStatus === SubProductStatus.ACTIVE && sp.verified)
+                        .filter((sp: SubProductResponseDTO) => 
+                          sp.subProductStatus === SubProductStatus.ACTIVE && 
+                          sp.verified &&
+                          sp.productId === selectedProductId
+                        )
                         .map((subproduct: SubProductResponseDTO) => (
                           <MenuItem key={subproduct.subProductId} value={subproduct.subProductId}>
                             {subproduct.subProductName} ({subproduct.subProductCode})

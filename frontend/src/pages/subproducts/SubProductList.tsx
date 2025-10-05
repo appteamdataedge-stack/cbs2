@@ -1,7 +1,7 @@
-import { Add as AddIcon, Edit as EditIcon, Verified as VerifiedIcon } from '@mui/icons-material';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import { Add as AddIcon, Edit as EditIcon, Verified as VerifiedIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Box, IconButton, Tooltip, TextField, InputAdornment } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { getAllSubProducts, verifySubProduct } from '../../api/subProductService';
@@ -12,7 +12,8 @@ import type { CustomerVerificationDTO, SubProductResponseDTO, SubProductStatus }
 const SubProductList = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [sort, setSort] = useState<string | undefined>(undefined);
+  const [, setSort] = useState<string | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState('');
   const [verificationModal, setVerificationModal] = useState<{
     open: boolean;
     subProductId: number | null;
@@ -21,13 +22,52 @@ const SubProductList = () => {
     subProductId: null,
   });
 
-  // Fetch subproducts
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['subProducts', { page, size: rowsPerPage, sort }],
-    queryFn: () => getAllSubProducts(page, rowsPerPage, sort),
+  // Fetch all subproducts at once
+  const { data: allSubProducts, isLoading, error, refetch } = useQuery({
+    queryKey: ['all-subProducts'],
+    queryFn: () => getAllSubProducts(0, 1000), // Get a large number to effectively get all
     retry: 3,
     retryDelay: 1000
   });
+  
+  // Filter subproducts based on search term
+  const filteredSubProducts = useMemo(() => {
+    if (!allSubProducts?.content || searchTerm.trim() === '') {
+      return allSubProducts?.content || [];
+    }
+    
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    
+    return allSubProducts.content.filter((subProduct) => {
+      // Search in various fields
+      return (
+        subProduct.subProductName.toLowerCase().includes(lowerCaseSearch) || 
+        subProduct.subProductCode.toLowerCase().includes(lowerCaseSearch) ||
+        String(subProduct.subProductId).includes(lowerCaseSearch) ||
+        (subProduct.productName && subProduct.productName.toLowerCase().includes(lowerCaseSearch)) ||
+        (subProduct.productCode && subProduct.productCode.toLowerCase().includes(lowerCaseSearch)) ||
+        (subProduct.makerId && subProduct.makerId.toLowerCase().includes(lowerCaseSearch)) ||
+        (subProduct.inttCode && subProduct.inttCode.toLowerCase().includes(lowerCaseSearch))
+      );
+    });
+  }, [allSubProducts, searchTerm]);
+  
+  // Paginated data for the table
+  const paginatedData = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filteredSubProducts.slice(startIndex, endIndex);
+  }, [filteredSubProducts, page, rowsPerPage]);
+  
+  // Reset to first page when search changes
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
+
+  // Handle search input change - dynamic search as user types
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
 
   // Handle error if needed
   if (error) {
@@ -135,6 +175,39 @@ const SubProductList = () => {
         startIcon={<AddIcon />}
       />
 
+      {/* Search Panel - Right aligned */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+        <TextField
+          value={searchTerm}
+          onChange={handleSearchInputChange}
+          placeholder="Search subproducts..."
+          variant="outlined"
+          size="small"
+          sx={{ width: '300px' }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm && (
+              <InputAdornment position="end">
+                <IconButton 
+                  aria-label="clear search"
+                  onClick={() => setSearchTerm('')}
+                  edge="end"
+                  size="small"
+                >
+                  <Tooltip title="Clear search">
+                    <Box component="span" sx={{ display: 'flex' }}>×</Box>
+                  </Tooltip>
+                </IconButton>
+              </InputAdornment>
+            )
+          }}
+        />
+      </Box>
+
       {error ? (
         <ErrorDisplay 
           error={error} 
@@ -144,8 +217,8 @@ const SubProductList = () => {
       ) : (
         <DataTable
           columns={columns}
-          rows={data?.content || []}
-          totalItems={data?.totalElements || 0}
+          rows={paginatedData}
+          totalItems={filteredSubProducts.length}
           page={page}
           rowsPerPage={rowsPerPage}
           onPageChange={setPage}

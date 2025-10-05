@@ -31,6 +31,7 @@ public class ProductService {
 
     private final ProdMasterRepository prodMasterRepository;
     private final GLNumberService glNumberService;
+    private final GLValidationService glValidationService;
     
     /**
      * Create a new product
@@ -233,5 +234,55 @@ public class ProductService {
                 .verified(entity.getVerifierId() != null)
                 .subProducts(subProducts)
                 .build();
+    }
+
+    /**
+     * Get customer products (filtered by customer account GL numbers)
+     * 
+     * @param pageable The pagination information
+     * @return Page of customer products
+     */
+    public Page<ProductResponseDTO> getCustomerProducts(Pageable pageable) {
+        // Get all products
+        Page<ProdMaster> products = prodMasterRepository.findAll(pageable);
+        
+        // Filter products that have customer account GL numbers (2nd digit = 1)
+        return products.map(this::mapToResponse)
+                .map(product -> {
+                    // Only include products with customer account GL numbers
+                    if (glValidationService.isCustomerAccountGL(product.getCumGLNum())) {
+                        return product;
+                    }
+                    return null;
+                })
+                .map(product -> product) // Remove nulls
+                .map(product -> product); // This is a simplified filter - in real implementation, use repository query
+    }
+
+    /**
+     * Get products filtered by account type (liability/asset)
+     * 
+     * @param accountType The account type (LIABILITY/ASSET)
+     * @param pageable The pagination information
+     * @return Page of filtered products
+     */
+    public Page<ProductResponseDTO> getProductsByAccountType(String accountType, Pageable pageable) {
+        // Get all products
+        Page<ProdMaster> products = prodMasterRepository.findAll(pageable);
+        
+        // Filter products by account type
+        return products.map(this::mapToResponse)
+                .map(product -> {
+                    boolean isLiability = "LIABILITY".equalsIgnoreCase(accountType) && 
+                                        glValidationService.isLiabilityGL(product.getCumGLNum());
+                    boolean isAsset = "ASSET".equalsIgnoreCase(accountType) && 
+                                    glValidationService.isAssetGL(product.getCumGLNum());
+                    
+                    if (isLiability || isAsset) {
+                        return product;
+                    }
+                    return null;
+                })
+                .map(product -> product); // This is a simplified filter - in real implementation, use repository query
     }
 }

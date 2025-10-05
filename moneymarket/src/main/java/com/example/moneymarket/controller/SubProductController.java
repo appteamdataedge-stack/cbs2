@@ -145,4 +145,48 @@ public class SubProductController {
         SubProductResponseDTO verifiedSubProduct = subProductService.verifySubProduct(id, verificationDTO);
         return ResponseEntity.ok(verifiedSubProduct);
     }
+
+    /**
+     * Get customer sub-products (filtered by customer account GL numbers)
+     * 
+     * @param pageable The pagination information
+     * @return Page of customer sub-products
+     */
+    @GetMapping("/customer-subproducts")
+    public ResponseEntity<Page<SubProductResponseDTO>> getCustomerSubProducts(Pageable pageable) {
+        Page<SubProductResponseDTO> subProducts = subProductService.getCustomerSubProducts(pageable);
+        return ResponseEntity.ok(subProducts);
+    }
+
+    /**
+     * Get sub-products filtered by account type (liability/asset)
+     * 
+     * @param accountType The account type (LIABILITY/ASSET)
+     * @param pageable The pagination information
+     * @return Page of filtered sub-products
+     */
+    @GetMapping("/by-account-type/{accountType}")
+    public ResponseEntity<Page<SubProductResponseDTO>> getSubProductsByAccountType(
+            @PathVariable String accountType,
+            Pageable pageable) {
+        Page<SubProductResponseDTO> subProducts = subProductService.getSubProductsByAccountType(accountType, pageable);
+        return ResponseEntity.ok(subProducts);
+    }
+
+    /**
+     * Get sub-products filtered by product ID and account type
+     * 
+     * @param productId The product ID
+     * @param accountType The account type (LIABILITY/ASSET)
+     * @param pageable The pagination information
+     * @return Page of filtered sub-products
+     */
+    @GetMapping("/by-product-and-type/{productId}/{accountType}")
+    public ResponseEntity<Page<SubProductResponseDTO>> getSubProductsByProductAndType(
+            @PathVariable Integer productId,
+            @PathVariable String accountType,
+            Pageable pageable) {
+        Page<SubProductResponseDTO> subProducts = subProductService.getSubProductsByProductAndType(productId, accountType, pageable);
+        return ResponseEntity.ok(subProducts);
+    }
 }

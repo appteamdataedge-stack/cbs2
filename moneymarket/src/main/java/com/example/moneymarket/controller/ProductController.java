@@ -132,4 +132,31 @@ public class ProductController {
         ProductResponseDTO verifiedProduct = productService.verifyProduct(id, verificationDTO);
         return ResponseEntity.ok(verifiedProduct);
     }
+
+    /**
+     * Get customer products (filtered by customer account GL numbers)
+     * 
+     * @param pageable The pagination information
+     * @return Page of customer products
+     */
+    @GetMapping("/customer-products")
+    public ResponseEntity<Page<ProductResponseDTO>> getCustomerProducts(Pageable pageable) {
+        Page<ProductResponseDTO> products = productService.getCustomerProducts(pageable);
+        return ResponseEntity.ok(products);
+    }
+
+    /**
+     * Get products filtered by account type (liability/asset)
+     * 
+     * @param accountType The account type (LIABILITY/ASSET)
+     * @param pageable The pagination information
+     * @return Page of filtered products
+     */
+    @GetMapping("/by-account-type/{accountType}")
+    public ResponseEntity<Page<ProductResponseDTO>> getProductsByAccountType(
+            @PathVariable String accountType,
+            Pageable pageable) {
+        Page<ProductResponseDTO> products = productService.getProductsByAccountType(accountType, pageable);
+        return ResponseEntity.ok(products);
+    }
 }

@@ -11,6 +11,7 @@ export enum AccountStatus {
 // Customer account request DTO
 export interface CustomerAccountRequestDTO {
   custId: number;
+  productId: number;
   subProductId: number;
   accountName: string;
   currency: string;

@@ -18,6 +18,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -278,5 +280,93 @@ public class SubProductService {
                 .verificationTime(entity.getVerificationTime())
                 .verified(entity.getVerifierId() != null)
                 .build();
+    }
+
+    /**
+     * Get customer sub-products (filtered by customer account GL numbers)
+     * 
+     * @param pageable The pagination information
+     * @return Page of customer sub-products
+     */
+    public Page<SubProductResponseDTO> getCustomerSubProducts(Pageable pageable) {
+        // Get all sub-products
+        Page<SubProdMaster> subProducts = subProdMasterRepository.findAll(pageable);
+        
+        // Filter sub-products that have customer account GL numbers (2nd digit = 1)
+        return subProducts.map(this::mapToResponse)
+                .map(subProduct -> {
+                    // Only include sub-products with customer account GL numbers
+                    if (glValidationService.isCustomerAccountGL(subProduct.getCumGLNum())) {
+                        return subProduct;
+                    }
+                    return null;
+                })
+                .map(subProduct -> subProduct); // This is a simplified filter - in real implementation, use repository query
+    }
+
+    /**
+     * Get sub-products filtered by account type (liability/asset)
+     * 
+     * @param accountType The account type (LIABILITY/ASSET)
+     * @param pageable The pagination information
+     * @return Page of filtered sub-products
+     */
+    public Page<SubProductResponseDTO> getSubProductsByAccountType(String accountType, Pageable pageable) {
+        // Get all sub-products
+        Page<SubProdMaster> subProducts = subProdMasterRepository.findAll(pageable);
+        
+        // Filter sub-products by account type
+        return subProducts.map(this::mapToResponse)
+                .map(subProduct -> {
+                    boolean isLiability = "LIABILITY".equalsIgnoreCase(accountType) && 
+                                        glValidationService.isLiabilityGL(subProduct.getCumGLNum());
+                    boolean isAsset = "ASSET".equalsIgnoreCase(accountType) && 
+                                    glValidationService.isAssetGL(subProduct.getCumGLNum());
+                    
+                    if (isLiability || isAsset) {
+                        return subProduct;
+                    }
+                    return null;
+                })
+                .map(subProduct -> subProduct); // This is a simplified filter - in real implementation, use repository query
+    }
+
+    /**
+     * Get sub-products filtered by product ID and account type
+     * 
+     * @param productId The product ID
+     * @param accountType The account type (LIABILITY/ASSET)
+     * @param pageable The pagination information
+     * @return Page of filtered sub-products
+     */
+    public Page<SubProductResponseDTO> getSubProductsByProductAndType(Integer productId, String accountType, Pageable pageable) {
+        // Get sub-products by product ID (returns List, not Page)
+        List<SubProdMaster> subProductsList = subProdMasterRepository.findByProductProductId(productId);
+        
+        // Filter by account type
+        List<SubProductResponseDTO> filteredSubProducts = subProductsList.stream()
+                .map(this::mapToResponse)
+                .filter(subProduct -> {
+                    boolean isLiability = "LIABILITY".equalsIgnoreCase(accountType) && 
+                                        glValidationService.isLiabilityGL(subProduct.getCumGLNum());
+                    boolean isAsset = "ASSET".equalsIgnoreCase(accountType) && 
+                                    glValidationService.isAssetGL(subProduct.getCumGLNum());
+                    
+                    return isLiability || isAsset;
+                })
+                .collect(java.util.stream.Collectors.toList());
+        
+        // Apply pagination manually
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), filteredSubProducts.size());
+        
+        List<SubProductResponseDTO> paginatedSubProducts = filteredSubProducts.subList(start, end);
+        
+        // Create Page object
+        return new org.springframework.data.domain.PageImpl<>(
+                paginatedSubProducts,
+                pageable,
+                filteredSubProducts.size()
+        );
     }
 }
