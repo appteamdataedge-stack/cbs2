@@ -106,11 +106,7 @@ public class SubProductService {
         SubProdMaster subProduct = subProdMasterRepository.findById(subProductId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sub-Product", "ID", subProductId));
 
-        // Check if sub-product code is unique (if changed)
-        if (!subProduct.getSubProductCode().equals(subProductRequestDTO.getSubProductCode()) &&
-            subProdMasterRepository.existsBySubProductCode(subProductRequestDTO.getSubProductCode())) {
-            throw new BusinessException("Sub-Product Code already exists");
-        }
+        // Sub-product code uniqueness validation removed for updates
 
         // Validate product exists
         ProdMaster product = prodMasterRepository.findById(subProductRequestDTO.getProductId())

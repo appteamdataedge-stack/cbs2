@@ -29,11 +29,7 @@ public class ProductValidator implements Validator {
     public void validate(Object target, Errors errors) {
         ProductRequestDTO product = (ProductRequestDTO) target;
 
-        // Check if Product Code is unique
-        if (prodMasterRepository.existsByProductCode(product.getProductCode())) {
-            errors.rejectValue("productCode", "duplicate.productCode", 
-                    "Product Code already exists");
-        }
+        // Product Code uniqueness validation removed
 
         // Validate GL Number exists in GL_setup and is at Layer 3
         var glSetup = glSetupRepository.findById(product.getCumGLNum());

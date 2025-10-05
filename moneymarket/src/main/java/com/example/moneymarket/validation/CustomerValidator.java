@@ -27,11 +27,7 @@ public class CustomerValidator implements Validator {
     public void validate(Object target, Errors errors) {
         CustomerRequestDTO customer = (CustomerRequestDTO) target;
 
-        // Check if External Customer ID is unique
-        if (custMasterRepository.existsByExtCustId(customer.getExtCustId())) {
-            errors.rejectValue("extCustId", "duplicate.extCustId", 
-                    "External Customer ID already exists");
-        }
+        // External Customer ID uniqueness validation removed
 
         // Validate customer name fields based on customer type
         if (customer.getCustType() == CustomerType.Individual) {

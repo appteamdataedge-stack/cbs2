@@ -44,8 +44,7 @@ const SubProductList = () => {
         subProduct.subProductName.toLowerCase().includes(lowerCaseSearch) || 
         subProduct.subProductCode.toLowerCase().includes(lowerCaseSearch) ||
         String(subProduct.subProductId).includes(lowerCaseSearch) ||
-        (subProduct.productName && subProduct.productName.toLowerCase().includes(lowerCaseSearch)) ||
-        (subProduct.productCode && subProduct.productCode.toLowerCase().includes(lowerCaseSearch)) ||
+        String(subProduct.productId).includes(lowerCaseSearch) ||
         (subProduct.makerId && subProduct.makerId.toLowerCase().includes(lowerCaseSearch)) ||
         (subProduct.inttCode && subProduct.inttCode.toLowerCase().includes(lowerCaseSearch))
       );
@@ -113,7 +112,7 @@ const SubProductList = () => {
     { id: 'subProductId', label: 'ID', minWidth: 50, sortable: true },
     { id: 'subProductCode', label: 'SubProduct Code', minWidth: 120, sortable: true },
     { id: 'subProductName', label: 'SubProduct Name', minWidth: 180, sortable: true },
-    { id: 'productName', label: 'Product', minWidth: 150 },
+    { id: 'productId', label: 'Product ID', minWidth: 100 },
     { 
       id: 'interestRate', 
       label: 'Interest Rate', 

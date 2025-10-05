@@ -88,6 +88,7 @@ const AppRoutes = () => {
         {/* Account Management */}
         <Route path="/accounts" element={<AccountList />} />
         <Route path="/accounts/new" element={<AccountForm />} />
+        <Route path="/accounts/edit/:accountNo" element={<AccountForm />} />
         <Route path="/accounts/:accountNo" element={<AccountDetails />} />
 
         {/* Transaction Management */}

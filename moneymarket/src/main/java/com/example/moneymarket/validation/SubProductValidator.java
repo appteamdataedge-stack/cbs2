@@ -44,11 +44,7 @@ public class SubProductValidator implements Validator {
     public void validate(@NonNull Object target, @NonNull Errors errors) {
         SubProductRequestDTO subProduct = (SubProductRequestDTO) target;
 
-        // Check if Sub-Product Code is unique
-        if (subProdMasterRepository.existsBySubProductCode(subProduct.getSubProductCode())) {
-            errors.rejectValue("subProductCode", "duplicate.subProductCode", 
-                    "Sub-Product Code already exists");
-        }
+        // Sub-Product Code uniqueness validation removed
 
         // Check if Product ID exists
         if (!prodMasterRepository.existsById(subProduct.getProductId())) {

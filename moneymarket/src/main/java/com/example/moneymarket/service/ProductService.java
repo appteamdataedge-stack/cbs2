@@ -81,11 +81,7 @@ public class ProductService {
         ProdMaster product = prodMasterRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "ID", productId));
 
-        // Check if product code is unique (if changed)
-        if (!product.getProductCode().equals(productRequestDTO.getProductCode()) &&
-            prodMasterRepository.existsByProductCode(productRequestDTO.getProductCode())) {
-            throw new BusinessException("Product Code already exists");
-        }
+        // Product code uniqueness validation removed for updates
 
         // Validate GL Number exists and is at layer 3
         try {

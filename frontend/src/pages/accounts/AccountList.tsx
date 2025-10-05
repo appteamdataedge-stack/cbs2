@@ -1,4 +1,4 @@
-import { Add as AddIcon, Visibility as ViewIcon, Close as CloseIcon } from '@mui/icons-material';
+import { Add as AddIcon, Visibility as ViewIcon, Close as CloseIcon, Edit as EditIcon } from '@mui/icons-material';
 import { Box, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -80,20 +80,19 @@ const AccountList = () => {
   // Table columns
   const columns: Column<CustomerAccountResponseDTO>[] = [
     { id: 'accountNo', label: 'Account Number', minWidth: 150, sortable: true },
-    { id: 'accountName', label: 'Account Name', minWidth: 180, sortable: true },
-    { id: 'customerName', label: 'Customer Name', minWidth: 180 },
+    { id: 'acctName', label: 'Account Name', minWidth: 180, sortable: true },
+    { id: 'custName', label: 'Customer Name', minWidth: 180 },
     { id: 'subProductName', label: 'Product', minWidth: 150 },
-    { id: 'currency', label: 'Currency', minWidth: 80 },
     { 
-      id: 'balance', 
-      label: 'Balance', 
+      id: 'currentBalance', 
+      label: 'Current Balance', 
       minWidth: 120,
       align: 'right',
       format: (value: number | null | undefined) => (value !== null && value !== undefined) ? `${value.toLocaleString()}` : 'N/A'
     },
     { 
-      id: 'interestAccrued', 
-      label: 'Interest Accrued', 
+      id: 'availableBalance', 
+      label: 'Available Balance', 
       minWidth: 120,
       align: 'right',
       format: (value: number | null | undefined) => (value !== null && value !== undefined) ? `${value.toLocaleString()}` : 'N/A'
@@ -112,6 +111,15 @@ const AccountList = () => {
       minWidth: 100,
       format: (_, row: CustomerAccountResponseDTO) => (
         <Box>
+          <Tooltip title="Edit">
+            <IconButton 
+              component={RouterLink} 
+              to={`/accounts/edit/${row.accountNo}`} 
+              color="primary"
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="View Details">
             <IconButton 
               component={RouterLink} 
@@ -121,7 +129,7 @@ const AccountList = () => {
               <ViewIcon />
             </IconButton>
           </Tooltip>
-          {row.accountStatus === AccountStatus.ACTIVE && row.currentBalance === 0 && (
+          {row.accountStatus === AccountStatus.ACTIVE && (row.currentBalance === 0 || row.currentBalance === null) && (
             <Tooltip title="Close Account">
               <IconButton 
                 color="error" 

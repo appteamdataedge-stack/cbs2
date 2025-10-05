@@ -123,7 +123,7 @@ const SubProductForm = () => {
   });
 
   const isLoading = createMutation.isPending || updateMutation.isPending || isLoadingProducts || isLoadingGLSetups || isLoadingFilteredGLSetups;
-  const isDisabled = isLoading || (isEdit && subProductData?.verified);
+  const isDisabled = isLoading;
 
   // Clear GL fields when product changes
   useEffect(() => {

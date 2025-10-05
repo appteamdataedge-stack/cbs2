@@ -18,11 +18,11 @@ import {
   TextField
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { createCustomerAccount } from '../../api/customerAccountService';
+import { createCustomerAccount, getCustomerAccountByAccountNo, updateCustomerAccount } from '../../api/customerAccountService';
 import { getAllCustomers } from '../../api/customerService';
 import { getAllSubProducts } from '../../api/subProductService';
 import { FormSection, PageHeader } from '../../components/common';
@@ -30,6 +30,8 @@ import type { CustomerAccountRequestDTO, CustomerResponseDTO, SubProductResponse
 import { CustomerType, SubProductStatus, AccountStatus } from '../../types';
 
 const AccountForm = () => {
+  const { accountNo } = useParams<{ accountNo: string }>();
+  const isEdit = Boolean(accountNo);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   
@@ -71,6 +73,13 @@ const AccountForm = () => {
     queryFn: () => getAllSubProducts(0, 100),
   });
 
+  // Get account data if editing
+  const { data: accountData, isLoading: isLoadingAccount } = useQuery({
+    queryKey: ['account', accountNo],
+    queryFn: () => getCustomerAccountByAccountNo(accountNo!),
+    enabled: isEdit && Boolean(accountNo),
+  });
+
   // Get selected values
   const selectedCustId = watch('custId');
   const selectedSubProductId = watch('subProductId');
@@ -99,11 +108,29 @@ const AccountForm = () => {
     }
   });
 
-  const isLoading = createAccountMutation.isPending || isLoadingCustomers || isLoadingSubProducts;
+  // Update account mutation
+  const updateAccountMutation = useMutation({
+    mutationFn: (data: CustomerAccountRequestDTO) => updateCustomerAccount(accountNo!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['account', accountNo] });
+      toast.success('Account updated successfully');
+      navigate('/accounts');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update account: ${error.message}`);
+    }
+  });
+
+  const isLoading = createAccountMutation.isPending || updateAccountMutation.isPending || isLoadingCustomers || isLoadingSubProducts || isLoadingAccount;
 
   // Submit handler
   const onSubmit = (data: CustomerAccountRequestDTO) => {
-    createAccountMutation.mutate(data);
+    if (isEdit) {
+      updateAccountMutation.mutate(data);
+    } else {
+      createAccountMutation.mutate(data);
+    }
   };
 
   // Generate account name and customer name based on customer and subproduct
@@ -123,6 +150,21 @@ const AccountForm = () => {
     }
   };
 
+  // Populate form when editing
+  useEffect(() => {
+    if (accountData && isEdit) {
+      setValue('custId', accountData.custId);
+      setValue('subProductId', accountData.subProductId);
+      setValue('acctName', accountData.acctName);
+      setValue('dateOpening', accountData.dateOpening);
+      setValue('tenor', accountData.tenor);
+      setValue('dateMaturity', accountData.dateMaturity);
+      setValue('dateClosure', accountData.dateClosure);
+      setValue('branchCode', accountData.branchCode);
+      setValue('accountStatus', accountData.accountStatus);
+    }
+  }, [accountData, isEdit, setValue]);
+
   // Handle dialog close
   const handleCloseSuccessDialog = () => {
     setSuccessDialogOpen(false);
@@ -132,7 +174,7 @@ const AccountForm = () => {
   return (
     <Box>
         <PageHeader
-          title="Create New Account"
+          title={isEdit ? "Edit Account" : "Create New Account"}
           buttonText="Back to Accounts"
           buttonLink="/accounts"
           startIcon={<ArrowBackIcon />}

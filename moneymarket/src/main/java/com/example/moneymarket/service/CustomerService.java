@@ -81,11 +81,7 @@ public class CustomerService {
         CustMaster customer = custMasterRepository.findById(custId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "ID", custId));
 
-        // Check if external customer ID is unique (if changed)
-        if (!customer.getExtCustId().equals(customerRequestDTO.getExtCustId()) &&
-            custMasterRepository.existsByExtCustId(customerRequestDTO.getExtCustId())) {
-            throw new BusinessException("External Customer ID already exists");
-        }
+        // External customer ID uniqueness validation removed for updates
 
         // Validate customer type specific fields
         validateCustomerTypeFields(customerRequestDTO);
