@@ -110,7 +110,6 @@ class CustomerAccountIntegrationTest {
 
         // Mock account balance
         AcctBal mockBalance = new AcctBal();
-        mockBalance.setAccountNo(mockAccountNo);
         mockBalance.setAccount(mockAccount);
         mockBalance.setCurrentBalance(BigDecimal.ZERO);
         mockBalance.setAvailableBalance(BigDecimal.ZERO);

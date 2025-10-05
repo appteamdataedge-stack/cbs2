@@ -19,13 +19,14 @@ import java.time.LocalDateTime;
  * 
  * Customer Account Number (12 digits):
  * - First 8 digits = Primary Cust_Id
- * - 9th digit = Product type code:
- *   1 = Savings Bank (GL 110101000, sub-products 110101xxx)
- *   2 = Current Account (GL 110102000, sub-products 110102xxx)
- *   3 = Term Deposit (GL 110201000, sub-products 110201xxx)
- *   4 = Recurring Deposit
- *   5 = Overdraft / CC (GL 210201000, sub-products 210201xxx)
- *   6 = Term Loan
+ * - 9th digit = Product category digit (based on Product GL_Num):
+ *   1 = GL 110101000
+ *   2 = GL 110102000
+ *   3 = GL 110201000
+ *   4 = GL 130101000
+ *   5 = GL 140101000
+ *   6 = GL 210201000
+ *   7 = GL 240101000
  * - Last 3 digits = running sequence 001–999 per product per customer
  * 
  * Office Accounts:
@@ -61,13 +62,17 @@ public class AccountNumberService {
             throw new BusinessException("Customer ID must be exactly 8 digits for account number generation");
         }
         
-        // Determine product type code from GL number
-        String glNum = subProduct.getCumGLNum();
-        if (glNum == null || glNum.isEmpty()) {
-            throw new BusinessException("Cannot generate account number: GL Number is null or empty");
+        // Determine product type code from Product GL_Num (not SubProduct GL_Num)
+        if (subProduct.getProduct() == null) {
+            throw new BusinessException("Cannot generate account number: Product information is missing");
         }
         
-        char productTypeCode = determineProductTypeCode(glNum);
+        String productGLNum = subProduct.getProduct().getCumGLNum();
+        if (productGLNum == null || productGLNum.isEmpty()) {
+            throw new BusinessException("Cannot generate account number: Product GL Number is null or empty");
+        }
+        
+        char productTypeCode = determineProductTypeCode(productGLNum);
         
         // Find the next sequence number for this customer and product type
         String prefix = custId + productTypeCode;
@@ -88,8 +93,8 @@ public class AccountNumberService {
         // Construct the account number (12 digits: 8 for custId + 1 for product type + 3 for sequence)
         String accountNumber = prefix + formattedSequence;
         
-        log.info("Generated customer account number: {} for customer: {} and product type: {}", 
-                accountNumber, custId, productTypeCode);
+        log.info("Generated customer account number: {} for customer: {} and Product GL_Num: {} (9th digit: {})", 
+                accountNumber, custId, productGLNum, productTypeCode);
         return accountNumber;
     }
     
@@ -190,36 +195,28 @@ public class AccountNumberService {
     }
     
     /**
-     * Determines the product type code based on the GL number
+     * Determines the product type code based on the Product GL_Num
      * 
-     * @param glNum The GL number
-     * @return The product type code
+     * @param glNum The Product GL_Num
+     * @return The product type code (9th digit)
      */
     private char determineProductTypeCode(String glNum) {
-        if (glNum == null || glNum.length() < 6) {
+        if (glNum == null || glNum.isEmpty()) {
             throw new BusinessException("Invalid GL number format for product type determination");
         }
         
-        // Extract relevant part of GL number for product type determination
-        String glPrefix = glNum.substring(0, 6);
-        
-        // Determine product type based on GL prefix
-        switch (glPrefix) {
-            case "110101": return '1'; // Savings Bank
-            case "110102": return '2'; // Current Account
-            case "110201": return '3'; // Term Deposit
-            case "110202": return '4'; // Recurring Deposit
-            case "210201": return '5'; // Overdraft / CC
-            case "210202": return '6'; // Term Loan
+        // Map Product GL_Num to 9th digit based on business rules
+        switch (glNum) {
+            case "110101000": return '1';
+            case "110102000": return '2';
+            case "110201000": return '3';
+            case "130101000": return '4';
+            case "140101000": return '5';
+            case "210201000": return '6';
+            case "240101000": return '7';
             default:
-                // For any other GL, determine based on first digit
-                if (glNum.startsWith("1")) {
-                    return '3'; // Default to Term Deposit for liability accounts
-                } else if (glNum.startsWith("2")) {
-                    return '5'; // Default to Overdraft for asset accounts
-                } else {
-                    throw new BusinessException("Cannot determine product type code for GL: " + glNum);
-                }
+                throw new BusinessException("Cannot determine product type code for Product GL_Num: " + glNum + 
+                    ". Supported GL_Nums: 110101000, 110102000, 110201000, 130101000, 140101000, 210201000, 240101000");
         }
     }
 }

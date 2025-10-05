@@ -1,5 +1,6 @@
 import { ArrowBack as ArrowBackIcon, Save as SaveIcon } from '@mui/icons-material';
 import {
+  Autocomplete,
   Box,
   Button,
   CircularProgress,
@@ -17,17 +18,16 @@ import {
   TextField
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { createCustomerAccount } from '../../api/customerAccountService';
 import { getAllCustomers } from '../../api/customerService';
 import { getAllSubProducts } from '../../api/subProductService';
-import { getAllProducts } from '../../api/productService';
 import { FormSection, PageHeader } from '../../components/common';
 import type { CustomerAccountRequestDTO, CustomerResponseDTO, SubProductResponseDTO } from '../../types';
-import { CustomerType, SubProductStatus } from '../../types';
+import { CustomerType, SubProductStatus, AccountStatus } from '../../types';
 
 const AccountForm = () => {
   const navigate = useNavigate();
@@ -47,11 +47,15 @@ const AccountForm = () => {
   } = useForm<CustomerAccountRequestDTO>({
     defaultValues: {
       custId: 0,
-      productId: 0,
       subProductId: 0,
-      accountName: '',
-      currency: '',
-      makerId: 'FRONTEND_USER', // Default maker ID
+      custName: '',
+      acctName: '',
+      dateOpening: new Date().toISOString().split('T')[0], // Today's date
+      tenor: undefined,
+      dateMaturity: undefined,
+      dateClosure: undefined,
+      branchCode: '001', // Default branch code
+      accountStatus: AccountStatus.ACTIVE,
     }
   });
 
@@ -61,21 +65,14 @@ const AccountForm = () => {
     queryFn: () => getAllCustomers(0, 100),
   });
 
-  // Get products for dropdown (customer products only)
-  const { data: productsData, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['customer-products', { page: 0, size: 100 }], // Get customer products for dropdown
-    queryFn: () => getAllProducts(0, 100), // TODO: Replace with getCustomerProducts when API is ready
-  });
-
-  // Get subproducts for dropdown (customer subproducts only)
+  // Get subproducts for dropdown
   const { data: subProductsData, isLoading: isLoadingSubProducts } = useQuery({
-    queryKey: ['customer-subproducts', { page: 0, size: 100 }], // Get customer subproducts for dropdown
-    queryFn: () => getAllSubProducts(0, 100), // TODO: Replace with getCustomerSubProducts when API is ready
+    queryKey: ['subproducts', { page: 0, size: 100 }],
+    queryFn: () => getAllSubProducts(0, 100),
   });
 
   // Get selected values
   const selectedCustId = watch('custId');
-  const selectedProductId = watch('productId');
   const selectedSubProductId = watch('subProductId');
 
   // Find selected customer and subproduct
@@ -86,7 +83,7 @@ const AccountForm = () => {
   const createAccountMutation = useMutation({
     mutationFn: createCustomerAccount,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['customerAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
       
       // Show dialog with account number instead of toast
       if (data.message) {
@@ -102,19 +99,14 @@ const AccountForm = () => {
     }
   });
 
-  const isLoading = createAccountMutation.isPending || isLoadingCustomers || isLoadingProducts || isLoadingSubProducts;
-
-  // Clear sub-product when product changes
-  useEffect(() => {
-    setValue('subProductId', 0);
-  }, [selectedProductId, setValue]);
+  const isLoading = createAccountMutation.isPending || isLoadingCustomers || isLoadingSubProducts;
 
   // Submit handler
   const onSubmit = (data: CustomerAccountRequestDTO) => {
     createAccountMutation.mutate(data);
   };
 
-  // Generate account name based on customer and subproduct
+  // Generate account name and customer name based on customer and subproduct
   const generateAccountName = () => {
     if (selectedCustomer && selectedSubProduct) {
       let customerName = '';
@@ -126,7 +118,8 @@ const AccountForm = () => {
       }
       
       const accountName = `${customerName} - ${selectedSubProduct.subProductName}`;
-      setValue('accountName', accountName);
+      setValue('custName', customerName);
+      setValue('acctName', accountName);
     }
   };
 
@@ -138,34 +131,34 @@ const AccountForm = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Create New Account"
-        buttonText="Back to Accounts"
-        buttonLink="/accounts"
-        startIcon={<ArrowBackIcon />}
-      />
-      
-      {/* Success Dialog */}
-      <Dialog
-        open={successDialogOpen}
-        onClose={handleCloseSuccessDialog}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-      >
-        <DialogTitle id="alert-dialog-title">Account Created</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="alert-dialog-description">
-            {createdAccountNo}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseSuccessDialog} color="primary" autoFocus>
-            OK
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <PageHeader
+          title="Create New Account"
+          buttonText="Back to Accounts"
+          buttonLink="/accounts"
+          startIcon={<ArrowBackIcon />}
+        />
+        
+        {/* Success Dialog */}
+        <Dialog
+          open={successDialogOpen}
+          onClose={handleCloseSuccessDialog}
+          aria-labelledby="alert-dialog-title"
+          aria-describedby="alert-dialog-description"
+        >
+          <DialogTitle id="alert-dialog-title">Account Created</DialogTitle>
+          <DialogContent>
+            <DialogContentText id="alert-dialog-description">
+              {createdAccountNo}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseSuccessDialog} color="primary" autoFocus>
+              OK
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit)}>
         <FormSection title="Account Information">
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
@@ -190,62 +183,59 @@ const AccountForm = () => {
                   validate: value => value > 0 || 'Please select a customer'
                 }}
                 render={({ field }) => (
-                  <FormControl fullWidth error={!!errors.custId} disabled={isLoading}>
-                    <InputLabel id="customer-label">Primary Cust Id</InputLabel>
-                    <Select
-                      {...field}
-                      labelId="customer-label"
-                      label="Primary Cust Id"
-                      onChange={(e) => {
-                        field.onChange(e);
-                        generateAccountName();
-                      }}
-                    >
-                      {customersData?.content.map((customer: CustomerResponseDTO) => {
-                        let displayName = '';
-                        if (customer.custType === CustomerType.INDIVIDUAL) {
-                          displayName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
-                        } else {
-                          displayName = customer.tradeName || '';
-                        }
-                        
-                        return (
-                          <MenuItem key={customer.custId} value={customer.custId}>
-                            {displayName} ({customer.extCustId})
-                          </MenuItem>
-                        );
-                      })}
-                    </Select>
-                    <FormHelperText>{errors.custId?.message}</FormHelperText>
-                  </FormControl>
-                )}
-              />
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="productId"
-                control={control}
-                rules={{ 
-                  required: 'Product is mandatory',
-                  validate: value => value > 0 || 'Please select a product'
-                }}
-                render={({ field }) => (
-                  <FormControl fullWidth error={!!errors.productId} disabled={isLoading}>
-                    <InputLabel id="product-label">Product Code</InputLabel>
-                    <Select
-                      {...field}
-                      labelId="product-label"
-                      label="Product Code"
-                    >
-                      {productsData?.content.map((product) => (
-                        <MenuItem key={product.productId} value={product.productId}>
-                          {product.productName} ({product.productCode})
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    <FormHelperText>{errors.productId?.message}</FormHelperText>
-                  </FormControl>
+                  <Autocomplete
+                    options={customersData?.content || []}
+                    getOptionLabel={(option: CustomerResponseDTO) => {
+                      let displayName = '';
+                      if (option.custType === CustomerType.INDIVIDUAL) {
+                        displayName = `${option.firstName || ''} ${option.lastName || ''}`.trim();
+                      } else {
+                        displayName = option.tradeName || '';
+                      }
+                      return `${displayName} (${option.extCustId})`;
+                    }}
+                    value={customersData?.content.find((customer: CustomerResponseDTO) => customer.custId === field.value) || null}
+                    onChange={(_, newValue: CustomerResponseDTO | null) => {
+                      const customerId = newValue?.custId || 0;
+                      field.onChange(customerId);
+                      generateAccountName();
+                    }}
+                    disabled={isLoading}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Customer *"
+                        error={!!errors.custId}
+                        helperText={errors.custId?.message}
+                        placeholder="Search and select customer..."
+                      />
+                    )}
+                    renderOption={(props, option: CustomerResponseDTO) => {
+                      let displayName = '';
+                      if (option.custType === CustomerType.INDIVIDUAL) {
+                        displayName = `${option.firstName || ''} ${option.lastName || ''}`.trim();
+                      } else {
+                        displayName = option.tradeName || '';
+                      }
+                      return (
+                        <Box component="li" {...props} key={option.custId}>
+                          <Box>
+                            <Box sx={{ fontWeight: 'medium' }}>
+                              {displayName}
+                            </Box>
+                            <Box sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
+                              {option.extCustId} • {option.custType}
+                            </Box>
+                          </Box>
+                        </Box>
+                      );
+                    }}
+                    isOptionEqualToValue={(option: CustomerResponseDTO, value: CustomerResponseDTO) => 
+                      option.custId === value.custId
+                    }
+                    noOptionsText="No customers found"
+                    loading={isLoadingCustomers}
+                  />
                 )}
               />
             </Grid>
@@ -258,45 +248,59 @@ const AccountForm = () => {
                   required: 'SubProduct is mandatory',
                   validate: value => value > 0 || 'Please select a subproduct'
                 }}
-                render={({ field }) => (
-                  <FormControl fullWidth error={!!errors.subProductId} disabled={isLoading}>
-                    <InputLabel id="subproduct-label">SubProduct</InputLabel>
-                    <Select
-                      {...field}
-                      labelId="subproduct-label"
-                      label="SubProduct"
-                      onChange={(e) => {
-                        field.onChange(e);
-                        const subprod = subProductsData?.content.find(
-                          (s: SubProductResponseDTO) => s.subProductId === e.target.value
-                        );
-                        if (subprod) {
-                          // You might need to set currency based on subproduct if applicable
-                          generateAccountName();
-                        }
+                render={({ field }) => {
+                  const activeSubProducts = subProductsData?.content.filter((sp: SubProductResponseDTO) => 
+                    sp.subProductStatus === SubProductStatus.ACTIVE && sp.verified
+                  ) || [];
+                  
+                  return (
+                    <Autocomplete
+                      options={activeSubProducts}
+                      getOptionLabel={(option: SubProductResponseDTO) => 
+                        `${option.subProductName} (${option.subProductCode})`
+                      }
+                      value={activeSubProducts.find((subproduct: SubProductResponseDTO) => subproduct.subProductId === field.value) || null}
+                      onChange={(_, newValue: SubProductResponseDTO | null) => {
+                        const subProductId = newValue?.subProductId || 0;
+                        field.onChange(subProductId);
+                        generateAccountName();
                       }}
-                    >
-                      {subProductsData?.content
-                        .filter((sp: SubProductResponseDTO) => 
-                          sp.subProductStatus === SubProductStatus.ACTIVE && 
-                          sp.verified &&
-                          sp.productId === selectedProductId
-                        )
-                        .map((subproduct: SubProductResponseDTO) => (
-                          <MenuItem key={subproduct.subProductId} value={subproduct.subProductId}>
-                            {subproduct.subProductName} ({subproduct.subProductCode})
-                          </MenuItem>
-                        ))}
-                    </Select>
-                    <FormHelperText>{errors.subProductId?.message}</FormHelperText>
-                  </FormControl>
-                )}
+                      disabled={isLoading}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="SubProduct *"
+                          error={!!errors.subProductId}
+                          helperText={errors.subProductId?.message}
+                          placeholder="Search and select subproduct..."
+                        />
+                      )}
+                      renderOption={(props, option: SubProductResponseDTO) => (
+                        <Box component="li" {...props} key={option.subProductId}>
+                          <Box>
+                            <Box sx={{ fontWeight: 'medium' }}>
+                              {option.subProductName}
+                            </Box>
+                            <Box sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
+                              {option.subProductCode} • {option.productName}
+                            </Box>
+                          </Box>
+                        </Box>
+                      )}
+                      isOptionEqualToValue={(option: SubProductResponseDTO, value: SubProductResponseDTO) => 
+                        option.subProductId === value.subProductId
+                      }
+                      noOptionsText="No subproducts found"
+                      loading={isLoadingSubProducts}
+                    />
+                  );
+                }}
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <Controller
-                name="accountName"
+                name="acctName"
                 control={control}
                 rules={{ required: 'Account Name is mandatory' }}
                 render={({ field }) => (
@@ -305,74 +309,143 @@ const AccountForm = () => {
                     label="Account Name"
                     fullWidth
                     required
-                    error={!!errors.accountName}
-                    helperText={errors.accountName?.message}
+                    error={!!errors.acctName}
+                    helperText={errors.acctName?.message}
                     disabled={isLoading}
                   />
                 )}
               />
             </Grid>
-              
+
             <Grid item xs={12} md={6}>
               <Controller
-                name="currency"
+                name="dateOpening"
                 control={control}
-                rules={{ required: 'Currency is mandatory' }}
+                rules={{ required: 'Date of Opening is mandatory' }}
                 render={({ field }) => (
-                  <FormControl fullWidth error={!!errors.currency} disabled={isLoading}>
-                    <InputLabel id="currency-label">Currency</InputLabel>
+                  <TextField
+                    {...field}
+                    label="Date of Opening"
+                    type="date"
+                    fullWidth
+                    required
+                    error={!!errors.dateOpening}
+                    helperText={errors.dateOpening?.message}
+                    disabled={isLoading}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="tenor"
+                control={control}
+                rules={{ 
+                  min: { value: 1, message: 'Tenor must be at least 1 day' },
+                  max: { value: 999, message: 'Tenor cannot exceed 999 days' }
+                }}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Tenor (Days)"
+                    type="number"
+                    fullWidth
+                    error={!!errors.tenor}
+                    helperText={errors.tenor?.message || 'Optional: Number of days for term deposits'}
+                    disabled={isLoading}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="dateMaturity"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Date of Maturity"
+                    type="date"
+                    fullWidth
+                    error={!!errors.dateMaturity}
+                    helperText={errors.dateMaturity?.message || 'Optional: For term deposits'}
+                    disabled={isLoading}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="dateClosure"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Date of Closure"
+                    type="date"
+                    fullWidth
+                    error={!!errors.dateClosure}
+                    helperText={errors.dateClosure?.message || 'Optional: When account was closed'}
+                    disabled={isLoading}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="branchCode"
+                control={control}
+                rules={{ required: 'Branch Code is mandatory' }}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Branch Code"
+                    fullWidth
+                    required
+                    error={!!errors.branchCode}
+                    helperText={errors.branchCode?.message}
+                    disabled={isLoading}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="accountStatus"
+                control={control}
+                rules={{ required: 'Account Status is mandatory' }}
+                render={({ field }) => (
+                  <FormControl fullWidth error={!!errors.accountStatus} disabled={isLoading}>
+                    <InputLabel id="status-label">Account Status</InputLabel>
                     <Select
                       {...field}
-                      labelId="currency-label"
-                      label="Currency"
-                      onChange={(e) => {
-                        field.onChange(e);
-                        // setSelectedCurrency(e.target.value as string);
-                      }}
+                      labelId="status-label"
+                      label="Account Status"
                     >
-                      <MenuItem value="USD">USD - US Dollar</MenuItem>
-                      <MenuItem value="EUR">EUR - Euro</MenuItem>
-                      <MenuItem value="GBP">GBP - British Pound</MenuItem>
-                      <MenuItem value="JPY">JPY - Japanese Yen</MenuItem>
+                      <MenuItem value={AccountStatus.ACTIVE}>Active</MenuItem>
+                      <MenuItem value={AccountStatus.INACTIVE}>Inactive</MenuItem>
+                      <MenuItem value={AccountStatus.CLOSED}>Closed</MenuItem>
+                      <MenuItem value={AccountStatus.DORMANT}>Dormant</MenuItem>
                     </Select>
-                    <FormHelperText>{errors.currency?.message}</FormHelperText>
+                    <FormHelperText>{errors.accountStatus?.message}</FormHelperText>
                   </FormControl>
                 )}
               />
             </Grid>
-            
-              <Grid item xs={12} md={6}>
-                <Controller
-                  name="makerId"
-                  control={control}
-                  rules={{
-                    required: 'Maker ID is mandatory'
-                  }}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Maker ID"
-                      fullWidth
-                      required
-                      error={!!errors.makerId}
-                      helperText={errors.makerId?.message}
-                      disabled={isLoading}
-                    />
-                  )}
-                />
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Branch Code"
-                  value="001"
-                  fullWidth
-                  disabled={true}
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                />
-              </Grid>
           </Grid>
         </FormSection>
 

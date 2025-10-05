@@ -61,7 +61,7 @@ const ProductForm = () => {
       // Set form values from loaded product data
       setValue('productCode', productData.productCode);
       setValue('productName', productData.productName);
-      setValue('productType', productData.productType);
+      // setValue('productType', productData.productType); // Removed as productType doesn't exist in backend
       setValue('cumGLNum', productData.cumGLNum);
       setValue('makerId', 'FRONTEND_USER'); // Use default for edits too
     }

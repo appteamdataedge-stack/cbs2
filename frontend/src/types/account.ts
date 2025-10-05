@@ -4,38 +4,43 @@
 
 // Account status enum
 export enum AccountStatus {
-  OPEN = 'OPEN',
-  CLOSED = 'CLOSED'
+  ACTIVE = 'Active',
+  INACTIVE = 'Inactive', 
+  CLOSED = 'Closed',
+  DORMANT = 'Dormant'
 }
 
 // Customer account request DTO
 export interface CustomerAccountRequestDTO {
   custId: number;
-  productId: number;
   subProductId: number;
-  accountName: string;
-  currency: string;
-  makerId: string;
+  custName?: string;
+  acctName: string;
+  dateOpening: string; // LocalDate as ISO string
+  tenor?: number;
+  dateMaturity?: string; // LocalDate as ISO string
+  dateClosure?: string; // LocalDate as ISO string
+  branchCode: string;
+  accountStatus: AccountStatus;
 }
 
 // Customer account response DTO
 export interface CustomerAccountResponseDTO {
   accountNo: string;
-  custId: number;
-  extCustId?: string;
-  customerName?: string;
   subProductId: number;
-  subProductCode?: string;
   subProductName?: string;
-  accountName: string;
-  currency: string;
-  balance: number;
-  interestAccrued: number;
-  status: AccountStatus;
-  openDate: string; // LocalDate as ISO string
-  closeDate?: string; // LocalDate as ISO string
-  makerId: string;
-  interestRate?: number;
+  glNum?: string;
+  custId: number;
+  custName?: string;
+  acctName: string;
+  dateOpening: string; // LocalDate as ISO string
+  tenor?: number;
+  dateMaturity?: string; // LocalDate as ISO string
+  dateClosure?: string; // LocalDate as ISO string
+  branchCode: string;
+  accountStatus: AccountStatus;
+  currentBalance?: number;
+  availableBalance?: number;
   message?: string; // Optional message from API
 }
 

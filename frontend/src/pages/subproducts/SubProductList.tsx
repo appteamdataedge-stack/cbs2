@@ -24,7 +24,7 @@ const SubProductList = () => {
 
   // Fetch all subproducts at once
   const { data: allSubProducts, isLoading, error, refetch } = useQuery({
-    queryKey: ['all-subProducts'],
+    queryKey: ['subproducts', 'all'],
     queryFn: () => getAllSubProducts(0, 1000), // Get a large number to effectively get all
     retry: 3,
     retryDelay: 1000

@@ -48,8 +48,8 @@ public class CustomerAccountService {
         CustMaster customer = custMasterRepository.findById(accountRequestDTO.getCustId())
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "ID", accountRequestDTO.getCustId()));
 
-        // Validate sub-product exists and is active
-        SubProdMaster subProduct = subProdMasterRepository.findById(accountRequestDTO.getSubProductId())
+        // Validate sub-product exists and is active (with Product relationship loaded)
+        SubProdMaster subProduct = subProdMasterRepository.findByIdWithProduct(accountRequestDTO.getSubProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Sub-Product", "ID", accountRequestDTO.getSubProductId()));
 
         if (subProduct.getSubProductStatus() != SubProdMaster.SubProductStatus.Active) {
@@ -68,7 +68,6 @@ public class CustomerAccountService {
         
         // Initialize account balance
         AcctBal accountBalance = AcctBal.builder()
-                .accountNo(accountNo)
                 .account(savedAccount)
                 .currentBalance(BigDecimal.ZERO)
                 .availableBalance(BigDecimal.ZERO)

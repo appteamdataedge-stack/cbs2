@@ -85,6 +85,7 @@ const CustomerForm = () => {
   const createMutation = useMutation({
     mutationFn: createCustomer,
     onSuccess: (data: CustomerResponseDTO) => {
+      // Invalidate customer queries to ensure all customer lists refresh
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       // Show dialog with customer ID instead of toast
       if (data.message) {
@@ -103,10 +104,10 @@ const CustomerForm = () => {
   const updateMutation = useMutation({
     mutationFn: (data: CustomerRequestDTO) => updateCustomer(Number(id), data),
     onSuccess: () => {
+      // Invalidate customer queries to ensure all customer lists refresh
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['customer', id] });
-      toast.success('Customer updated successfully');
-      navigate('/customers');
+      setSuccessDialogOpen(true);
     },
     onError: (error: Error) => {
       toast.error(`Failed to update customer: ${error.message}`);
@@ -124,10 +125,22 @@ const CustomerForm = () => {
     }
   };
 
-  // Handle dialog close
+  // Handle dialog close - stay on the same page for create mode, navigate for edit mode
   const handleCloseSuccessDialog = () => {
     setSuccessDialogOpen(false);
-    navigate(`/customers`);
+    if (!isEdit) {
+      // For create mode, stay on the same page and reset form
+      setValue('extCustId', '');
+      setValue('firstName', '');
+      setValue('lastName', '');
+      setValue('tradeName', '');
+      setValue('address1', '');
+      setValue('mobile', '');
+      setValue('custType', CustomerType.INDIVIDUAL);
+    } else {
+      // For edit mode, navigate back to customers list
+      navigate('/customers');
+    }
   };
   
   return (
@@ -146,10 +159,12 @@ const CustomerForm = () => {
         aria-labelledby="alert-dialog-title"
         aria-describedby="alert-dialog-description"
       >
-        <DialogTitle id="alert-dialog-title">Customer Created</DialogTitle>
+        <DialogTitle id="alert-dialog-title">
+          {isEdit ? 'Customer Updated' : 'Customer Created Successfully'}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
-            {createdCustomerId}
+            {isEdit ? 'Customer updated successfully' : createdCustomerId || 'Customer created successfully'}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -251,6 +266,7 @@ const CustomerForm = () => {
                       name="firstName"
                       control={control}
                       rules={{
+                        required: custType === CustomerType.INDIVIDUAL ? 'First Name is required for Individual customers' : false,
                         maxLength: {
                           value: 50,
                           message: 'First Name cannot exceed 50 characters'
@@ -261,6 +277,7 @@ const CustomerForm = () => {
                           {...field}
                           label="First Name"
                           fullWidth
+                          required={custType === CustomerType.INDIVIDUAL}
                           error={!!errors.firstName}
                           helperText={errors.firstName?.message}
                           disabled={isLoading}
@@ -274,6 +291,7 @@ const CustomerForm = () => {
                       name="lastName"
                       control={control}
                       rules={{
+                        required: custType === CustomerType.INDIVIDUAL ? 'Last Name is required for Individual customers' : false,
                         maxLength: {
                           value: 50,
                           message: 'Last Name cannot exceed 50 characters'
@@ -284,6 +302,7 @@ const CustomerForm = () => {
                           {...field}
                           label="Last Name"
                           fullWidth
+                          required={custType === CustomerType.INDIVIDUAL}
                           error={!!errors.lastName}
                           helperText={errors.lastName?.message}
                           disabled={isLoading}
@@ -298,6 +317,7 @@ const CustomerForm = () => {
                     name="tradeName"
                     control={control}
                     rules={{
+                      required: (custType === CustomerType.CORPORATE || custType === CustomerType.BANK) ? 'Trade Name is required for Corporate and Bank customers' : false,
                       maxLength: {
                         value: 100,
                         message: 'Trade Name cannot exceed 100 characters'
@@ -308,6 +328,7 @@ const CustomerForm = () => {
                         {...field}
                         label="Trade Name"
                         fullWidth
+                        required={(custType === CustomerType.CORPORATE || custType === CustomerType.BANK)}
                         error={!!errors.tradeName}
                         helperText={errors.tradeName?.message}
                         disabled={isLoading}
@@ -345,23 +366,29 @@ const CustomerForm = () => {
                   name="mobile"
                   control={control}
                   rules={{
+                    required: 'Mobile number is required',
                     pattern: {
-                      value: /^[0-9]{1,15}$/,
-                      message: 'Mobile number must contain only digits and cannot exceed 15 digits'
+                      value: /^01[0-9]{9}$/,
+                      message: 'Please enter a valid Bangladeshi mobile number'
                     },
-                    maxLength: {
-                      value: 15,
-                      message: 'Mobile number cannot exceed 15 digits'
+                    validate: (value) => {
+                      if (!value) return 'Mobile number is required';
+                      if (!/^01[0-9]{9}$/.test(value)) {
+                        return 'Please enter a valid Bangladeshi mobile number';
+                      }
+                      return true;
                     }
                   }}
                   render={({ field }) => (
                     <TextField
                       {...field}
-                      label="Mobile"
+                      label="Mobile Number"
                       fullWidth
+                      required
                       error={!!errors.mobile}
-                      helperText={errors.mobile?.message}
+                      helperText={errors.mobile?.message || "Format: 01XXXXXXXXX (11 digits starting with 01)"}
                       disabled={isLoading}
+                      placeholder="01712345678"
                     />
                   )}
                 />

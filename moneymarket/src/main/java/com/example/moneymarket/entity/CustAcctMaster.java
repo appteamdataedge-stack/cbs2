@@ -17,7 +17,7 @@ import java.time.LocalDate;
 public class CustAcctMaster {
 
     @Id
-    @Column(name = "Account_No", length = 12)
+    @Column(name = "Account_No", length = 13)
     private String accountNo;
 
     @ManyToOne

@@ -99,7 +99,7 @@ const SubProductForm = () => {
   const createMutation = useMutation({
     mutationFn: createSubProduct,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['subProducts'] });
+      queryClient.invalidateQueries({ queryKey: ['subproducts'] });
       toast.success('SubProduct created successfully');
       navigate(`/subproducts/${data.subProductId}`);
     },
@@ -112,7 +112,7 @@ const SubProductForm = () => {
   const updateMutation = useMutation({
     mutationFn: (data: SubProductRequestDTO) => updateSubProduct(Number(id), data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subProducts'] });
+      queryClient.invalidateQueries({ queryKey: ['subproducts'] });
       queryClient.invalidateQueries({ queryKey: ['subProduct', id] });
       toast.success('SubProduct updated successfully');
       navigate('/subproducts');

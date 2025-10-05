@@ -24,7 +24,7 @@ const ProductList = () => {
 
   // Fetch all products at once
   const { data: allProducts, isLoading, error, refetch } = useQuery({
-    queryKey: ['all-products'],
+    queryKey: ['products', 'all'],
     queryFn: () => getAllProducts(0, 1000), // Get a large number to effectively get all
     retry: 3,
     retryDelay: 1000

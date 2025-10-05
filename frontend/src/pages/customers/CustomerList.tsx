@@ -1,6 +1,6 @@
 import { Add as AddIcon, Edit as EditIcon, Verified as VerifiedIcon, Search as SearchIcon } from '@mui/icons-material';
 import { Box, IconButton, Tooltip, TextField, InputAdornment } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -11,6 +11,7 @@ import { CustomerType } from '../../types';
 import type { CustomerResponseDTO, CustomerVerificationDTO } from '../../types';
 
 const CustomerList = () => {
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [, setSort] = useState<string | undefined>(undefined);
@@ -25,7 +26,7 @@ const CustomerList = () => {
 
   // Fetch all customers at once
   const { data: allCustomers, isLoading, error, refetch } = useQuery({
-    queryKey: ['all-customers'],
+    queryKey: ['customers', 'all'],
     queryFn: () => getAllCustomers(0, 1000), // Get a large number to effectively get all
   });
   
@@ -97,7 +98,8 @@ const CustomerList = () => {
       const verificationData: CustomerVerificationDTO = { verifierId };
       await verifyCustomer(verificationModal.customerId, verificationData);
       toast.success('Customer verified successfully');
-      refetch();
+      // Invalidate customer queries to refresh all customer data
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to verify customer');
       throw err; // Re-throw to let the modal component handle the error

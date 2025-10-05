@@ -106,7 +106,7 @@ const AccountDetails = () => {
 
   // Format amount
   const formatAmount = (amount: number) => {
-    return `${amount.toLocaleString()} ${account.currency}`;
+    return `${amount.toLocaleString()}`;
   };
 
   return (
@@ -121,8 +121,8 @@ const AccountDetails = () => {
       <Card variant="outlined" sx={{ mb: 3 }}>
         <CardContent>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h5">{account.accountName}</Typography>
-            <StatusBadge status={account.status} />
+            <Typography variant="h5">{account.acctName}</Typography>
+            <StatusBadge status={account.accountStatus} />
           </Box>
           <Typography variant="subtitle1" gutterBottom>
             Account Number: {account.accountNo}
@@ -136,7 +136,7 @@ const AccountDetails = () => {
                   Balance
                 </Typography>
                 <Typography variant="h4">
-                  {formatAmount(account.balance)}
+                  {formatAmount(account.currentBalance || 0)}
                 </Typography>
               </Paper>
             </Grid>
@@ -146,7 +146,7 @@ const AccountDetails = () => {
                   Interest Accrued
                 </Typography>
                 <Typography variant="h4">
-                  {formatAmount(account.interestAccrued)}
+                  {formatAmount(account.availableBalance || 0)}
                 </Typography>
               </Paper>
             </Grid>
@@ -168,39 +168,39 @@ const AccountDetails = () => {
                   <Typography variant="subtitle2" color="text.secondary">
                     Currency
                   </Typography>
-                  <Typography variant="body1">{account.currency}</Typography>
+                  <Typography variant="body1">N/A</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Status
                   </Typography>
-                  <Typography variant="body1">{account.status}</Typography>
+                  <Typography variant="body1">{account.accountStatus}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Open Date
                   </Typography>
-                  <Typography variant="body1">{formatDate(account.openDate)}</Typography>
+                  <Typography variant="body1">{formatDate(account.dateOpening)}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Close Date
                   </Typography>
-                  <Typography variant="body1">{formatDate(account.closeDate)}</Typography>
+                  <Typography variant="body1">{formatDate(account.dateClosure)}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Interest Rate
                   </Typography>
                   <Typography variant="body1">
-                    {account.interestRate ? `${account.interestRate}%` : 'N/A'}
+                    N/A
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Created By
                   </Typography>
-                  <Typography variant="body1">{account.makerId}</Typography>
+                  <Typography variant="body1">N/A</Typography>
                 </Grid>
               </Grid>
             </CardContent>
@@ -221,14 +221,14 @@ const AccountDetails = () => {
                     Customer ID
                   </Typography>
                   <Typography variant="body1">
-                    {account.custId} {account.extCustId ? `(${account.extCustId})` : ''}
+                    {account.custId}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Customer Name
                   </Typography>
-                  <Typography variant="body1">{account.customerName || 'N/A'}</Typography>
+                  <Typography variant="body1">{account.custName || 'N/A'}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
@@ -241,7 +241,7 @@ const AccountDetails = () => {
                     SubProduct
                   </Typography>
                   <Typography variant="body1">
-                    {account.subProductName ? `${account.subProductName} (${account.subProductCode})` : 'N/A'}
+                    {account.subProductName || 'N/A'}
                   </Typography>
                 </Grid>
               </Grid>
@@ -250,7 +250,7 @@ const AccountDetails = () => {
         </Grid>
       </Grid>
 
-      {account.status === AccountStatus.OPEN && account.balance === 0 && (
+      {account.accountStatus === AccountStatus.ACTIVE && account.currentBalance === 0 && (
         <Box mt={3} display="flex" justifyContent="flex-end">
           <Button
             variant="contained"

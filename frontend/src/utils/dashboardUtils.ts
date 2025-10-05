@@ -37,7 +37,7 @@ export const useDashboardSummary = () => {
     isLoading: isSubProductsLoading,
     error: subProductsError 
   } = useQuery({
-    queryKey: ['subProducts', { page: 0, size: 1 }],
+    queryKey: ['subproducts', { page: 0, size: 1 }],
     queryFn: () => getAllSubProducts(0, 1),
   });
 

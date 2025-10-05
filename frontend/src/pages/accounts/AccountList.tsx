@@ -26,7 +26,7 @@ const AccountList = () => {
 
   // Fetch accounts
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['customerAccounts', { page, size: rowsPerPage, sort }],
+    queryKey: ['accounts', { page, size: rowsPerPage, sort }],
     queryFn: () => getAllCustomerAccounts(page, rowsPerPage, sort),
     retry: 3,
     retryDelay: 1000
@@ -89,14 +89,14 @@ const AccountList = () => {
       label: 'Balance', 
       minWidth: 120,
       align: 'right',
-      format: (value: number | null | undefined, row) => (value !== null && value !== undefined) ? `${value.toLocaleString()} ${row?.currency || ''}` : 'N/A'
+      format: (value: number | null | undefined) => (value !== null && value !== undefined) ? `${value.toLocaleString()}` : 'N/A'
     },
     { 
       id: 'interestAccrued', 
       label: 'Interest Accrued', 
       minWidth: 120,
       align: 'right',
-      format: (value: number | null | undefined, row) => (value !== null && value !== undefined) ? `${value.toLocaleString()} ${row?.currency || ''}` : 'N/A'
+      format: (value: number | null | undefined) => (value !== null && value !== undefined) ? `${value.toLocaleString()}` : 'N/A'
     },
     { 
       id: 'status', 
@@ -121,7 +121,7 @@ const AccountList = () => {
               <ViewIcon />
             </IconButton>
           </Tooltip>
-          {row.status === AccountStatus.OPEN && row.balance === 0 && (
+          {row.accountStatus === AccountStatus.ACTIVE && row.currentBalance === 0 && (
             <Tooltip title="Close Account">
               <IconButton 
                 color="error" 

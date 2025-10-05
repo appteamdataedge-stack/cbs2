@@ -40,7 +40,7 @@ const TransactionForm = () => {
 
   // Fetch customer accounts for dropdown
   const { data: accountsData, isLoading: isLoadingAccounts } = useQuery({
-    queryKey: ['customerAccounts', { page: 0, size: 100 }], // Get all accounts for dropdown
+    queryKey: ['accounts', { page: 0, size: 100 }], // Get all accounts for dropdown
     queryFn: () => getAllCustomerAccounts(0, 100),
   });
 
@@ -247,7 +247,7 @@ const TransactionForm = () => {
                         >
                           {accountsData?.content.map((account: CustomerAccountResponseDTO) => (
                             <MenuItem key={account.accountNo} value={account.accountNo}>
-                              {account.accountNo} - {account.accountName} ({account.currency})
+                              {account.accountNo} - {account.acctName}
                             </MenuItem>
                           ))}
                         </Select>
