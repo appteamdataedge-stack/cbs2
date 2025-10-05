@@ -15,7 +15,7 @@ interface StatCardProps {
 }
 
 const StatCard = ({ title, count, icon, color }: StatCardProps) => (
-  <Card raised>
+  <Card raised sx={{ width: '100%', height: '100%' }}>
     <CardContent>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
@@ -48,7 +48,7 @@ const Dashboard = () => {
   const { customerCount, productCount, subProductCount, accountCount, isLoading, error } = useDashboardSummary();
 
   return (
-    <Box>
+    <Box sx={{ width: '100%' }}>
       <PageHeader title="Dashboard" />
 
       {isLoading ? (
@@ -62,8 +62,8 @@ const Dashboard = () => {
           </Typography>
         </Paper>
       ) : (
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6} md={3}>
+        <Grid container spacing={3} sx={{ width: '100%' }}>
+          <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
             <StatCard
               title="Customers"
               count={customerCount}
@@ -71,7 +71,7 @@ const Dashboard = () => {
               color="#1976d2"
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
             <StatCard
               title="Products"
               count={productCount}
@@ -79,7 +79,7 @@ const Dashboard = () => {
               color="#2e7d32"
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
             <StatCard
               title="SubProducts"
               count={subProductCount}
@@ -87,7 +87,7 @@ const Dashboard = () => {
               color="#ff9800"
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
             <StatCard
               title="Accounts"
               count={accountCount}
