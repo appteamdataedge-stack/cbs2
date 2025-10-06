@@ -1,4 +1,4 @@
-import { Add as AddIcon, Visibility as ViewIcon } from '@mui/icons-material';
+import { Add as AddIcon, Visibility as ViewIcon, Search as SearchIcon } from '@mui/icons-material';
 import {
   Box,
   Button,
@@ -19,12 +19,14 @@ import {
   TableHead,
   TableRow,
   Tooltip,
-  Typography
+  Typography,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { getTransactionById } from '../../api/transactionService';
+import { getTransactionById, getAllTransactions } from '../../api/transactionService';
 import { DataTable, PageHeader } from '../../components/common';
 import type { Column } from '../../components/common';
 import type { TransactionLineResponseDTO, TransactionResponseDTO } from '../../types';
@@ -32,6 +34,9 @@ import { DrCrFlag } from '../../types';
 
 const TransactionList = () => {
   const { tranId } = useParams<{ tranId: string }>();
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionResponseDTO | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -41,6 +46,209 @@ const TransactionList = () => {
     queryFn: () => getTransactionById(tranId || ''),
     enabled: !!tranId
   });
+
+  // Mocked transaction data with BDT currency
+  const mockedTransactions: TransactionResponseDTO[] = [
+    {
+      tranId: 'TRX123456',
+      valueDate: '2025-01-15',
+      entryDate: '2025-01-15',
+      entryTime: '14:30:00',
+      narration: 'Fund transfer between accounts',
+      totalAmount: 50000.00,
+      userId: 'USER001',
+      lines: [
+        {
+          lineId: 1,
+          accountNo: 'ACC10001',
+          accountName: 'John Doe Savings',
+          drCrFlag: DrCrFlag.DEBIT,
+          tranCcy: 'BDT',
+          fcyAmt: 50000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 50000.00,
+          udf1: 'Transfer to investment'
+        },
+        {
+          lineId: 2,
+          accountNo: 'ACC10002',
+          accountName: 'John Doe Investment',
+          drCrFlag: DrCrFlag.CREDIT,
+          tranCcy: 'BDT',
+          fcyAmt: 50000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 50000.00,
+          udf1: 'Transfer from savings'
+        }
+      ]
+    },
+    {
+      tranId: 'TRX123457',
+      valueDate: '2025-01-14',
+      entryDate: '2025-01-14',
+      entryTime: '10:15:00',
+      narration: 'Deposit to account',
+      totalAmount: 25000.00,
+      userId: 'USER002',
+      lines: [
+        {
+          lineId: 1,
+          accountNo: 'ACC10003',
+          accountName: 'Sarah Smith Savings',
+          drCrFlag: DrCrFlag.CREDIT,
+          tranCcy: 'BDT',
+          fcyAmt: 25000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 25000.00,
+          udf1: 'Cash deposit'
+        },
+        {
+          lineId: 2,
+          accountNo: 'CASH001',
+          accountName: 'Cash Account',
+          drCrFlag: DrCrFlag.DEBIT,
+          tranCcy: 'BDT',
+          fcyAmt: 25000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 25000.00,
+          udf1: 'Cash deposit'
+        }
+      ]
+    },
+    {
+      tranId: 'TRX123458',
+      valueDate: '2025-01-13',
+      entryDate: '2025-01-13',
+      entryTime: '16:45:00',
+      narration: 'Loan disbursement',
+      totalAmount: 100000.00,
+      userId: 'USER003',
+      lines: [
+        {
+          lineId: 1,
+          accountNo: 'ACC10004',
+          accountName: 'Ahmed Hassan Current',
+          drCrFlag: DrCrFlag.CREDIT,
+          tranCcy: 'BDT',
+          fcyAmt: 100000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 100000.00,
+          udf1: 'Personal loan disbursement'
+        },
+        {
+          lineId: 2,
+          accountNo: 'LOAN001',
+          accountName: 'Personal Loan Portfolio',
+          drCrFlag: DrCrFlag.DEBIT,
+          tranCcy: 'BDT',
+          fcyAmt: 100000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 100000.00,
+          udf1: 'Loan disbursement'
+        }
+      ]
+    },
+    {
+      tranId: 'TRX123459',
+      valueDate: '2025-01-12',
+      entryDate: '2025-01-12',
+      entryTime: '11:20:00',
+      narration: 'Salary payment',
+      totalAmount: 75000.00,
+      userId: 'USER004',
+      lines: [
+        {
+          lineId: 1,
+          accountNo: 'ACC10005',
+          accountName: 'Fatima Khatun Salary',
+          drCrFlag: DrCrFlag.CREDIT,
+          tranCcy: 'BDT',
+          fcyAmt: 75000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 75000.00,
+          udf1: 'Monthly salary payment'
+        },
+        {
+          lineId: 2,
+          accountNo: 'PAY001',
+          accountName: 'Payroll Account',
+          drCrFlag: DrCrFlag.DEBIT,
+          tranCcy: 'BDT',
+          fcyAmt: 75000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 75000.00,
+          udf1: 'Salary payment'
+        }
+      ]
+    },
+    {
+      tranId: 'TRX123460',
+      valueDate: '2025-01-11',
+      entryDate: '2025-01-11',
+      entryTime: '09:30:00',
+      narration: 'Utility bill payment',
+      totalAmount: 15000.00,
+      userId: 'USER005',
+      lines: [
+        {
+          lineId: 1,
+          accountNo: 'ACC10006',
+          accountName: 'Rahman Electric Bill',
+          drCrFlag: DrCrFlag.DEBIT,
+          tranCcy: 'BDT',
+          fcyAmt: 15000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 15000.00,
+          udf1: 'Electricity bill payment'
+        },
+        {
+          lineId: 2,
+          accountNo: 'UTIL001',
+          accountName: 'Utility Collection Account',
+          drCrFlag: DrCrFlag.CREDIT,
+          tranCcy: 'BDT',
+          fcyAmt: 15000.00,
+          exchangeRate: 1.0,
+          lcyAmt: 15000.00,
+          udf1: 'Electricity bill collection'
+        }
+      ]
+    }
+  ];
+  
+  // Filter transactions based on search term using mocked data
+  const filteredTransactions = useMemo(() => {
+    if (!mockedTransactions || searchTerm.trim() === '') {
+      return mockedTransactions || [];
+    }
+    
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    
+    return mockedTransactions.filter((transaction) => {
+      // Search in various fields
+      return (
+        transaction.tranId.toLowerCase().includes(lowerCaseSearch) || 
+        transaction.narration.toLowerCase().includes(lowerCaseSearch) ||
+        transaction.userId.toLowerCase().includes(lowerCaseSearch) ||
+        String(transaction.totalAmount).includes(lowerCaseSearch) ||
+        transaction.valueDate.includes(lowerCaseSearch) ||
+        transaction.entryDate.includes(lowerCaseSearch) ||
+        transaction.entryTime.includes(lowerCaseSearch)
+      );
+    });
+  }, [searchTerm]);
+  
+  // Paginated data for the table
+  const paginatedData = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filteredTransactions.slice(startIndex, endIndex);
+  }, [filteredTransactions, page, rowsPerPage]);
+  
+  // Reset to first page when search changes
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
 
   // Handle transaction data when it's loaded
   if (transactionData && !selectedTransaction) {
@@ -59,81 +267,15 @@ const TransactionList = () => {
     setDialogOpen(false);
   };
 
+  // Handle search input change - dynamic search as user types
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
   // Format date
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString();
   };
-
-  // Mocked transaction data (would normally be fetched from API)
-  // In a real implementation, you would fetch from backend with pagination
-  const mockedTransactions: TransactionResponseDTO[] = [
-    {
-      tranId: 'TRX123456',
-      valueDate: '2025-09-15',
-      entryDate: '2025-09-15',
-      entryTime: '14:30:00',
-      narration: 'Fund transfer between accounts',
-      totalAmount: 5000.00,
-      userId: 'USER001',
-      lines: [
-        {
-          lineId: 1,
-          accountNo: 'ACC10001',
-          accountName: 'John Doe Savings',
-          drCrFlag: DrCrFlag.DEBIT,
-          tranCcy: 'USD',
-          fcyAmt: 5000.00,
-          exchangeRate: 1.0,
-          lcyAmt: 5000.00,
-          udf1: 'Transfer to investment'
-        },
-        {
-          lineId: 2,
-          accountNo: 'ACC10002',
-          accountName: 'John Doe Investment',
-          drCrFlag: DrCrFlag.CREDIT,
-          tranCcy: 'USD',
-          fcyAmt: 5000.00,
-          exchangeRate: 1.0,
-          lcyAmt: 5000.00,
-          udf1: 'Transfer from savings'
-        }
-      ]
-    },
-    {
-      tranId: 'TRX123457',
-      valueDate: '2025-09-14',
-      entryDate: '2025-09-14',
-      entryTime: '10:15:00',
-      narration: 'Deposit to account',
-      totalAmount: 1000.00,
-      userId: 'USER002',
-      lines: [
-        {
-          lineId: 1,
-          accountNo: 'ACC10003',
-          accountName: 'Sarah Smith Savings',
-          drCrFlag: DrCrFlag.CREDIT,
-          tranCcy: 'USD',
-          fcyAmt: 1000.00,
-          exchangeRate: 1.0,
-          lcyAmt: 1000.00,
-          udf1: 'Cash deposit'
-        },
-        {
-          lineId: 2,
-          accountNo: 'CASH001',
-          accountName: 'Cash Account',
-          drCrFlag: DrCrFlag.DEBIT,
-          tranCcy: 'USD',
-          fcyAmt: 1000.00,
-          exchangeRate: 1.0,
-          lcyAmt: 1000.00,
-          udf1: 'Cash deposit'
-        }
-      ]
-    }
-  ];
 
   // Table columns
   const columns: Column<TransactionResponseDTO>[] = [
@@ -188,18 +330,51 @@ const TransactionList = () => {
         startIcon={<AddIcon />}
       />
 
+      {/* Search Panel - Right aligned */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+        <TextField
+          value={searchTerm}
+          onChange={handleSearchInputChange}
+          placeholder="Search transactions..."
+          variant="outlined"
+          size="small"
+          sx={{ width: '300px' }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm && (
+              <InputAdornment position="end">
+                <IconButton 
+                  aria-label="clear search"
+                  onClick={() => setSearchTerm('')}
+                  edge="end"
+                  size="small"
+                >
+                  <Tooltip title="Clear search">
+                    <Box component="span" sx={{ display: 'flex' }}>×</Box>
+                  </Tooltip>
+                </IconButton>
+              </InputAdornment>
+            )
+          }}
+        />
+      </Box>
+
       {/* Transaction History */}
       <Card sx={{ mb: 4 }}>
         <CardContent>
-          {/* This would be replaced with the real backend data */}
           <DataTable
             columns={columns}
-            rows={mockedTransactions}
-            totalItems={mockedTransactions.length}
-            page={0}
-            rowsPerPage={10}
-            onPageChange={() => {}}
-            onRowsPerPageChange={() => {}}
+            rows={paginatedData}
+            totalItems={filteredTransactions.length}
+            page={page}
+            rowsPerPage={rowsPerPage}
+            onPageChange={setPage}
+            onRowsPerPageChange={setRowsPerPage}
+            loading={false}
             idField="tranId"
             emptyContent={
               <TableCell colSpan={7} align="center">
@@ -315,7 +490,7 @@ const TransactionList = () => {
               {/* Totals */}
               <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                 <Typography variant="subtitle1">
-                  Total Amount: {selectedTransaction.totalAmount.toLocaleString()} USD
+                  Total Amount: {selectedTransaction.totalAmount.toLocaleString()} BDT
                 </Typography>
               </Box>
             </>

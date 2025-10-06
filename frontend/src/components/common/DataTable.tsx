@@ -254,7 +254,24 @@ const DataTable = <T extends object>({
                         : (row as any)[key];
                       
                       return (
-                        <TableCell key={key} align={column.align}>
+                        <TableCell 
+                          key={key} 
+                          align={column.align}
+                          sx={{
+                            ...(column.id === 'actions' && {
+                              padding: '4px 8px',
+                              '& .MuiIconButton-root': {
+                                padding: '4px',
+                                margin: '0 2px',
+                              },
+                              '& .MuiBox-root': {
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }
+                            })
+                          }}
+                        >
                           {column.format ? column.format(value, row) : value}
                         </TableCell>
                       );

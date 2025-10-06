@@ -107,11 +107,12 @@ let theme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         root: {
-          padding: '16px',
+          padding: '8px 12px',
         },
         head: {
           fontWeight: 600,
           backgroundColor: 'rgba(25, 118, 210, 0.04)',
+          padding: '12px',
         },
       },
     },
@@ -245,7 +246,7 @@ const Layout = ({ children }: LayoutProps) => {
             }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexDirection: { xs: 'column', sm: 'row' } }}>
                 <Typography variant="body2" color="text.secondary">
-                  Money Market System &copy; {new Date().getFullYear()}
+                  Developed By dataedge limited &copy; {new Date().getFullYear()}
                 </Typography>
                 <Box sx={{ mt: { xs: 1, sm: 0 } }}>
                   <Typography variant="body2" color="text.secondary" component="span" sx={{ mx: 1 }}>

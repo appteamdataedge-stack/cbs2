@@ -1,7 +1,7 @@
-import { Add as AddIcon, Visibility as ViewIcon, Close as CloseIcon, Edit as EditIcon } from '@mui/icons-material';
-import { Box, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
+import { Add as AddIcon, Visibility as ViewIcon, Close as CloseIcon, Edit as EditIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Box, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TextField, InputAdornment } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { closeCustomerAccount, getAllCustomerAccounts } from '../../api/customerAccountService';
@@ -13,7 +13,8 @@ import type { CustomerAccountResponseDTO } from '../../types';
 const AccountList = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [sort, setSort] = useState<string | undefined>(undefined);
+  const [, setSort] = useState<string | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState('');
   const [closeConfirmDialog, setCloseConfirmDialog] = useState<{
     open: boolean;
     account: CustomerAccountResponseDTO | null;
@@ -24,13 +25,47 @@ const AccountList = () => {
 
   const queryClient = useQueryClient();
 
-  // Fetch accounts
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['accounts', { page, size: rowsPerPage, sort }],
-    queryFn: () => getAllCustomerAccounts(page, rowsPerPage, sort),
+  // Fetch all accounts at once for client-side filtering
+  const { data: allAccounts, isLoading, error, refetch } = useQuery({
+    queryKey: ['accounts', 'all'],
+    queryFn: () => getAllCustomerAccounts(0, 1000), // Get a large number to effectively get all
     retry: 3,
     retryDelay: 1000
   });
+  
+  // Filter accounts based on search term
+  const filteredAccounts = useMemo(() => {
+    if (!allAccounts?.content || searchTerm.trim() === '') {
+      return allAccounts?.content || [];
+    }
+    
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    
+    return allAccounts.content.filter((account) => {
+      // Search in various fields
+      return (
+        account.accountNo.toLowerCase().includes(lowerCaseSearch) || 
+        account.acctName.toLowerCase().includes(lowerCaseSearch) ||
+        account.custName.toLowerCase().includes(lowerCaseSearch) ||
+        account.subProductName.toLowerCase().includes(lowerCaseSearch) ||
+        String(account.currentBalance).includes(lowerCaseSearch) ||
+        String(account.availableBalance).includes(lowerCaseSearch) ||
+        account.accountStatus.toLowerCase().includes(lowerCaseSearch)
+      );
+    });
+  }, [allAccounts, searchTerm]);
+  
+  // Paginated data for the table
+  const paginatedData = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filteredAccounts.slice(startIndex, endIndex);
+  }, [filteredAccounts, page, rowsPerPage]);
+  
+  // Reset to first page when search changes
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
   
   // Handle error if needed
   if (error) {
@@ -41,7 +76,7 @@ const AccountList = () => {
   const closeAccountMutation = useMutation({
     mutationFn: closeCustomerAccount,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customerAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
       toast.success('Account closed successfully');
       handleCloseDialog();
     },
@@ -50,6 +85,11 @@ const AccountList = () => {
       handleCloseDialog();
     },
   });
+
+  // Handle search input change - dynamic search as user types
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
 
   // Handle sort
   const handleSort = (field: string, direction: 'asc' | 'desc') => {
@@ -110,14 +150,16 @@ const AccountList = () => {
       label: 'Actions', 
       minWidth: 100,
       format: (_, row: CustomerAccountResponseDTO) => (
-        <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Tooltip title="Edit">
             <IconButton 
               component={RouterLink} 
               to={`/accounts/edit/${row.accountNo}`} 
               color="primary"
+              size="small"
+              sx={{ padding: '4px' }}
             >
-              <EditIcon />
+              <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title="View Details">
@@ -125,8 +167,10 @@ const AccountList = () => {
               component={RouterLink} 
               to={`/accounts/${row.accountNo}`} 
               color="primary"
+              size="small"
+              sx={{ padding: '4px' }}
             >
-              <ViewIcon />
+              <ViewIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           {row.accountStatus === AccountStatus.ACTIVE && (row.currentBalance === 0 || row.currentBalance === null) && (
@@ -134,8 +178,10 @@ const AccountList = () => {
               <IconButton 
                 color="error" 
                 onClick={() => handleOpenCloseDialog(row)}
+                size="small"
+                sx={{ padding: '4px' }}
               >
-                <CloseIcon />
+                <CloseIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
@@ -153,6 +199,39 @@ const AccountList = () => {
         startIcon={<AddIcon />}
       />
 
+      {/* Search Panel - Right aligned */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+        <TextField
+          value={searchTerm}
+          onChange={handleSearchInputChange}
+          placeholder="Search accounts..."
+          variant="outlined"
+          size="small"
+          sx={{ width: '300px' }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm && (
+              <InputAdornment position="end">
+                <IconButton 
+                  aria-label="clear search"
+                  onClick={() => setSearchTerm('')}
+                  edge="end"
+                  size="small"
+                >
+                  <Tooltip title="Clear search">
+                    <Box component="span" sx={{ display: 'flex' }}>×</Box>
+                  </Tooltip>
+                </IconButton>
+              </InputAdornment>
+            )
+          }}
+        />
+      </Box>
+
       {error ? (
         <ErrorDisplay 
           error={error} 
@@ -162,8 +241,8 @@ const AccountList = () => {
       ) : (
         <DataTable
           columns={columns}
-          rows={data?.content || []}
-          totalItems={data?.totalElements || 0}
+          rows={paginatedData}
+          totalItems={filteredAccounts.length}
           page={page}
           rowsPerPage={rowsPerPage}
           onPageChange={setPage}

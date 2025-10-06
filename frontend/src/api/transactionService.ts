@@ -1,7 +1,7 @@
 /**
  * Transaction API service
  */
-import type { TransactionRequestDTO, TransactionResponseDTO } from '../types';
+import type { TransactionRequestDTO, TransactionResponseDTO, Page } from '../types';
 import { apiRequest } from './apiClient';
 
 const TRANSACTIONS_ENDPOINT = '/transactions';
@@ -14,6 +14,21 @@ export const createTransaction = async (transaction: TransactionRequestDTO): Pro
     method: 'POST',
     url: `${TRANSACTIONS_ENDPOINT}/entry`,
     data: transaction,
+  });
+};
+
+/**
+ * Get all transactions with pagination
+ */
+export const getAllTransactions = async (page = 0, size = 10, sort?: string): Promise<Page<TransactionResponseDTO>> => {
+  let url = `${TRANSACTIONS_ENDPOINT}?page=${page}&size=${size}`;
+  if (sort) {
+    url += `&sort=${sort}`;
+  }
+  
+  return apiRequest<Page<TransactionResponseDTO>>({
+    method: 'GET',
+    url,
   });
 };
 
