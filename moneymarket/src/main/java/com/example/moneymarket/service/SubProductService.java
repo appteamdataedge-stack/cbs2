@@ -262,6 +262,8 @@ public class SubProductService {
         return SubProductResponseDTO.builder()
                 .subProductId(entity.getSubProductId())
                 .productId(entity.getProduct().getProductId())
+                .productCode(entity.getProduct().getProductCode())
+                .productName(entity.getProduct().getProductName())
                 .subProductCode(entity.getSubProductCode())
                 .subProductName(entity.getSubProductName())
                 .inttCode(entity.getInttCode())

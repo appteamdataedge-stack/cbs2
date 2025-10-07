@@ -133,19 +133,23 @@ const AccountForm = () => {
     }
   };
 
-  // Generate account name and customer name based on customer and subproduct
+  // Derive display name from selected customer
+  const getSelectedCustomerName = (): string => {
+    if (!selectedCustomer) return '';
+    if (selectedCustomer.custType === CustomerType.INDIVIDUAL) {
+      return `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim();
+    }
+    return selectedCustomer.tradeName || '';
+  };
+
+  // Generate account name from current selections
   const generateAccountName = () => {
-    if (selectedCustomer && selectedSubProduct) {
-      let customerName = '';
-      
-      if (selectedCustomer.custType === CustomerType.INDIVIDUAL) {
-        customerName = `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim();
-      } else {
-        customerName = selectedCustomer.tradeName || '';
-      }
-      
-      const accountName = `${customerName} - ${selectedSubProduct.subProductName}`;
+    const customerName = getSelectedCustomerName();
+    if (customerName) {
       setValue('custName', customerName);
+    }
+    if (customerName && selectedSubProduct) {
+      const accountName = `${customerName} - ${selectedSubProduct.subProductName}`;
       setValue('acctName', accountName);
     }
   };
@@ -174,7 +178,7 @@ const AccountForm = () => {
   return (
     <Box>
         <PageHeader
-          title={isEdit ? "Edit Account" : "Create New Account"}
+          title={isEdit ? "Edit Account" : "Create New Customer Account"}
           buttonText="Back to Accounts"
           buttonLink="/accounts"
           startIcon={<ArrowBackIcon />}
@@ -234,13 +238,25 @@ const AccountForm = () => {
                       } else {
                         displayName = option.tradeName || '';
                       }
-                      return `${displayName} (${option.extCustId})`;
+                      return `${displayName} (ID: ${option.custId})`;
                     }}
                     value={customersData?.content.find((customer: CustomerResponseDTO) => customer.custId === field.value) || null}
                     onChange={(_, newValue: CustomerResponseDTO | null) => {
                       const customerId = newValue?.custId || 0;
                       field.onChange(customerId);
-                      generateAccountName();
+                      // Immediately set customer name from selection
+                      const name = newValue
+                        ? (newValue.custType === CustomerType.INDIVIDUAL
+                          ? `${newValue.firstName || ''} ${newValue.lastName || ''}`.trim()
+                          : newValue.tradeName || '')
+                        : '';
+                      if (name) {
+                        setValue('custName', name);
+                      }
+                      // Update account name if subproduct already chosen
+                      if (name && selectedSubProduct) {
+                        setValue('acctName', `${name} - ${selectedSubProduct.subProductName}`);
+                      }
                     }}
                     disabled={isLoading}
                     renderInput={(params) => (
@@ -266,7 +282,7 @@ const AccountForm = () => {
                               {displayName}
                             </Box>
                             <Box sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
-                              {option.extCustId} • {option.custType}
+                              ID: {option.custId} • {option.custType}
                             </Box>
                           </Box>
                         </Box>
@@ -305,7 +321,10 @@ const AccountForm = () => {
                       onChange={(_, newValue: SubProductResponseDTO | null) => {
                         const subProductId = newValue?.subProductId || 0;
                         field.onChange(subProductId);
-                        generateAccountName();
+                        const name = getSelectedCustomerName();
+                        if (name && newValue) {
+                          setValue('acctName', `${name} - ${newValue.subProductName}`);
+                        }
                       }}
                       disabled={isLoading}
                       renderInput={(params) => (

@@ -26,7 +26,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { getTransactionById, getAllTransactions } from '../../api/transactionService';
+import { getTransactionById } from '../../api/transactionService';
 import { DataTable, PageHeader } from '../../components/common';
 import type { Column } from '../../components/common';
 import type { TransactionLineResponseDTO, TransactionResponseDTO } from '../../types';
@@ -228,7 +228,7 @@ const TransactionList = () => {
       // Search in various fields
       return (
         transaction.tranId.toLowerCase().includes(lowerCaseSearch) || 
-        transaction.narration.toLowerCase().includes(lowerCaseSearch) ||
+        (transaction.narration && transaction.narration.toLowerCase().includes(lowerCaseSearch)) ||
         transaction.userId.toLowerCase().includes(lowerCaseSearch) ||
         String(transaction.totalAmount).includes(lowerCaseSearch) ||
         transaction.valueDate.includes(lowerCaseSearch) ||

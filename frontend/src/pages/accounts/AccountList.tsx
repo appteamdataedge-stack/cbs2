@@ -46,8 +46,8 @@ const AccountList = () => {
       return (
         account.accountNo.toLowerCase().includes(lowerCaseSearch) || 
         account.acctName.toLowerCase().includes(lowerCaseSearch) ||
-        account.custName.toLowerCase().includes(lowerCaseSearch) ||
-        account.subProductName.toLowerCase().includes(lowerCaseSearch) ||
+        (account.custName && account.custName.toLowerCase().includes(lowerCaseSearch)) ||
+        (account.subProductName && account.subProductName.toLowerCase().includes(lowerCaseSearch)) ||
         String(account.currentBalance).includes(lowerCaseSearch) ||
         String(account.availableBalance).includes(lowerCaseSearch) ||
         account.accountStatus.toLowerCase().includes(lowerCaseSearch)
@@ -121,7 +121,12 @@ const AccountList = () => {
   const columns: Column<CustomerAccountResponseDTO>[] = [
     { id: 'accountNo', label: 'Account Number', minWidth: 150, sortable: true },
     { id: 'acctName', label: 'Account Name', minWidth: 180, sortable: true },
-    { id: 'custName', label: 'Customer Name', minWidth: 180 },
+    { 
+      id: 'custName', 
+      label: 'Customer Name', 
+      minWidth: 180,
+      format: (value: string | null | undefined) => value || 'N/A'
+    },
     { id: 'subProductName', label: 'Product', minWidth: 150 },
     { 
       id: 'currentBalance', 
@@ -138,7 +143,7 @@ const AccountList = () => {
       format: (value: number | null | undefined) => (value !== null && value !== undefined) ? `${value.toLocaleString()}` : 'N/A'
     },
     { 
-      id: 'status', 
+      id: 'accountStatus', 
       label: 'Status', 
       minWidth: 100,
       format: (value: AccountStatus | null | undefined) => (
@@ -193,7 +198,7 @@ const AccountList = () => {
   return (
     <Box>
       <PageHeader
-        title="Account Management"
+        title="Customer Account Management"
         buttonText="Create Account"
         buttonLink="/accounts/new"
         startIcon={<AddIcon />}

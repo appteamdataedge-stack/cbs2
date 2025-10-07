@@ -46,20 +46,25 @@ export interface CustomerAccountResponseDTO {
 
 // Office account request DTO
 export interface OfficeAccountRequestDTO {
-  accountNo: string;
-  accountName: string;
-  currency: string;
-  makerId: string;
+  subProductId: number;
+  acctName: string;
+  dateOpening: string; // LocalDate as ISO string
+  dateClosure?: string; // LocalDate as ISO string
+  branchCode: string;
+  accountStatus: AccountStatus;
+  reconciliationRequired: boolean;
 }
 
 // Office account response DTO
 export interface OfficeAccountResponseDTO {
   accountNo: string;
-  accountName: string;
-  currency: string;
-  balance: number;
-  status: AccountStatus;
-  openDate: string; // LocalDate as ISO string
-  closeDate?: string; // LocalDate as ISO string
-  makerId: string;
+  subProductId: number;
+  subProductName?: string;
+  glNum?: string;
+  acctName: string;
+  dateOpening: string; // LocalDate as ISO string
+  dateClosure?: string; // LocalDate as ISO string
+  branchCode: string;
+  accountStatus: AccountStatus;
+  reconciliationRequired: boolean;
 }

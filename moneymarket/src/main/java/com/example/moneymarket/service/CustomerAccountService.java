@@ -232,10 +232,7 @@ public class CustomerAccountService {
                 .subProduct(subProduct)
                 .glNum(glNum)
                 .customer(customer)
-                .custName(dto.getCustName() != null ? dto.getCustName() : 
-                         (customer.getCustType() == CustMaster.CustomerType.Individual ? 
-                          customer.getFirstName() + " " + customer.getLastName() : 
-                          customer.getTradeName()))
+                .custName(dto.getCustName())
                 .acctName(dto.getAcctName())
                 .dateOpening(dto.getDateOpening())
                 .tenor(dto.getTenor())

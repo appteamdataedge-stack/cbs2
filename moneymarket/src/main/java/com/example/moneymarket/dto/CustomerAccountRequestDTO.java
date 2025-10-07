@@ -21,6 +21,7 @@ public class CustomerAccountRequestDTO {
     @NotNull(message = "Customer ID is mandatory")
     private Integer custId;
 
+    @NotBlank(message = "Customer Name is mandatory")
     @Size(max = 100, message = "Customer Name cannot exceed 100 characters")
     private String custName;
 

@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CustomerRequestDTO {
 
-    @NotBlank(message = "External Customer ID is mandatory")
+    // External Customer ID is optional; when provided, must not exceed 20 chars
     @Size(max = 20, message = "External Customer ID cannot exceed 20 characters")
     private String extCustId;
 

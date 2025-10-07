@@ -17,6 +17,8 @@ public class SubProductResponseDTO {
 
     private Integer subProductId;
     private Integer productId;
+    private String productCode;
+    private String productName;
     private String subProductCode;
     private String subProductName;
     private String inttCode;

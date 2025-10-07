@@ -23,6 +23,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import CategoryIcon from '@mui/icons-material/Category';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import BusinessIcon from '@mui/icons-material/Business';
 import PaymentIcon from '@mui/icons-material/Payment';
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircle from '@mui/icons-material/AccountCircle';
@@ -52,6 +53,7 @@ const Sidebar = ({ open, onToggle }: SidebarProps) => {
     { name: 'Products', path: '/products', icon: <CategoryIcon /> },
     { name: 'SubProducts', path: '/subproducts', icon: <ViewListIcon /> },
     { name: 'Accounts', path: '/accounts', icon: <AccountBalanceIcon /> },
+    { name: 'Office Accounts', path: '/office-accounts', icon: <BusinessIcon /> },
     { name: 'Transactions', path: '/transactions', icon: <PaymentIcon /> },
     { name: 'EOD', path: '/admin/eod', icon: <SettingsIcon /> },
   ];

@@ -213,7 +213,6 @@ const CustomerForm = () => {
                   name="extCustId"
                   control={control}
                   rules={{ 
-                    required: 'External Customer ID is mandatory',
                     maxLength: {
                       value: 20,
                       message: 'External Customer ID cannot exceed 20 characters'
@@ -224,7 +223,6 @@ const CustomerForm = () => {
                       {...field}
                       label="External Customer ID"
                       fullWidth
-                      required
                       error={!!errors.extCustId}
                       helperText={errors.extCustId?.message}
                       disabled={isLoading}

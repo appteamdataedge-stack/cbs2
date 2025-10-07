@@ -1,4 +1,4 @@
-import { Add as AddIcon, Edit as EditIcon, Verified as VerifiedIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Verified as VerifiedIcon, Search as SearchIcon, Visibility as ViewIcon } from '@mui/icons-material';
 import { Box, IconButton, Tooltip, TextField, InputAdornment } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useMemo, useEffect } from 'react';
@@ -45,6 +45,7 @@ const SubProductList = () => {
         subProduct.subProductCode.toLowerCase().includes(lowerCaseSearch) ||
         String(subProduct.subProductId).includes(lowerCaseSearch) ||
         String(subProduct.productId).includes(lowerCaseSearch) ||
+        (subProduct.productName && subProduct.productName.toLowerCase().includes(lowerCaseSearch)) ||
         (subProduct.makerId && subProduct.makerId.toLowerCase().includes(lowerCaseSearch)) ||
         (subProduct.inttCode && subProduct.inttCode.toLowerCase().includes(lowerCaseSearch))
       );
@@ -112,7 +113,12 @@ const SubProductList = () => {
     { id: 'subProductId', label: 'ID', minWidth: 50, sortable: true },
     { id: 'subProductCode', label: 'SubProduct Code', minWidth: 120, sortable: true },
     { id: 'subProductName', label: 'SubProduct Name', minWidth: 180, sortable: true },
-    { id: 'productId', label: 'Product ID', minWidth: 100 },
+    { 
+      id: 'productName', 
+      label: 'Product Name', 
+      minWidth: 150,
+      format: (value: string | undefined) => value || 'N/A'
+    },
     { 
       id: 'interestRate', 
       label: 'Interest Rate', 
@@ -138,14 +144,25 @@ const SubProductList = () => {
     { 
       id: 'actions', 
       label: 'Actions', 
-      minWidth: 100,
+      minWidth: 120,
       format: (_: any, row: SubProductResponseDTO) => (
-        <Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="View Details">
+            <IconButton 
+              component={RouterLink} 
+              to={`/subproducts/view/${row.subProductId}`} 
+              color="info"
+              size="small"
+            >
+              <ViewIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Edit">
             <IconButton 
               component={RouterLink} 
-              to={`/subproducts/${row.subProductId}`} 
+              to={`/subproducts/edit/${row.subProductId}`} 
               color="primary"
+              size="small"
             >
               <EditIcon />
             </IconButton>
@@ -155,6 +172,7 @@ const SubProductList = () => {
               <IconButton 
                 color="success" 
                 onClick={() => handleOpenVerifyModal(row.subProductId)}
+                size="small"
               >
                 <VerifiedIcon />
               </IconButton>

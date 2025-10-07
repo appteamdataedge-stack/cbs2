@@ -2,13 +2,19 @@ import { Route, Routes } from 'react-router-dom';
 import Dashboard from '../pages/Dashboard';
 import CustomerList from '../pages/customers/CustomerList';
 import CustomerForm from '../pages/customers/CustomerForm';
+import CustomerDetails from '../pages/customers/CustomerDetails';
 import ProductList from '../pages/products/ProductList';
 import ProductForm from '../pages/products/ProductForm';
+import ProductDetails from '../pages/products/ProductDetails';
 import SubProductList from '../pages/subproducts/SubProductList';
 import SubProductForm from '../pages/subproducts/SubProductForm';
+import SubProductDetails from '../pages/subproducts/SubProductDetails';
 import AccountList from '../pages/accounts/AccountList';
 import AccountForm from '../pages/accounts/AccountForm';
 import AccountDetails from '../pages/accounts/AccountDetails';
+import OfficeAccountList from '../pages/officeaccounts/OfficeAccountList';
+import OfficeAccountForm from '../pages/officeaccounts/OfficeAccountForm';
+import OfficeAccountDetails from '../pages/officeaccounts/OfficeAccountDetails';
 import TransactionList from '../pages/transactions/TransactionList';
 import TransactionForm from '../pages/transactions/TransactionForm';
 import EOD from '../pages/admin/EOD';
@@ -73,23 +79,32 @@ const AppRoutes = () => {
         {/* Customer Management */}
         <Route path="/customers" element={<CustomerList />} />
         <Route path="/customers/new" element={<CustomerForm />} />
-        <Route path="/customers/:id" element={<CustomerForm />} />
+        <Route path="/customers/edit/:id" element={<CustomerForm />} />
+        <Route path="/customers/view/:id" element={<CustomerDetails />} />
 
         {/* Product Management */}
         <Route path="/products" element={<ProductList />} />
         <Route path="/products/new" element={<ProductForm />} />
-        <Route path="/products/:id" element={<ProductForm />} />
+        <Route path="/products/edit/:id" element={<ProductForm />} />
+        <Route path="/products/view/:id" element={<ProductDetails />} />
 
         {/* SubProduct Management */}
         <Route path="/subproducts" element={<SubProductList />} />
         <Route path="/subproducts/new" element={<SubProductForm />} />
-        <Route path="/subproducts/:id" element={<SubProductForm />} />
+        <Route path="/subproducts/edit/:id" element={<SubProductForm />} />
+        <Route path="/subproducts/view/:id" element={<SubProductDetails />} />
 
         {/* Account Management */}
         <Route path="/accounts" element={<AccountList />} />
         <Route path="/accounts/new" element={<AccountForm />} />
         <Route path="/accounts/edit/:accountNo" element={<AccountForm />} />
         <Route path="/accounts/:accountNo" element={<AccountDetails />} />
+
+        {/* Office Account Management */}
+        <Route path="/office-accounts" element={<OfficeAccountList />} />
+        <Route path="/office-accounts/new" element={<OfficeAccountForm />} />
+        <Route path="/office-accounts/edit/:accountNo" element={<OfficeAccountForm />} />
+        <Route path="/office-accounts/:accountNo" element={<OfficeAccountDetails />} />
 
         {/* Transaction Management */}
         <Route path="/transactions" element={<TransactionList />} />

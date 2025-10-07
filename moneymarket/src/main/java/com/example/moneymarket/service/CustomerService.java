@@ -36,9 +36,11 @@ public class CustomerService {
      */
     @Transactional
     public CustomerResponseDTO createCustomer(CustomerRequestDTO customerRequestDTO) {
-        // Check if external customer ID is unique
-        if (custMasterRepository.existsByExtCustId(customerRequestDTO.getExtCustId())) {
-            throw new BusinessException("External Customer ID already exists");
+        // If External Customer ID provided, ensure uniqueness
+        if (customerRequestDTO.getExtCustId() != null && !customerRequestDTO.getExtCustId().trim().isEmpty()) {
+            if (custMasterRepository.existsByExtCustId(customerRequestDTO.getExtCustId())) {
+                throw new BusinessException("External Customer ID already exists");
+            }
         }
 
         // Validate customer type specific fields

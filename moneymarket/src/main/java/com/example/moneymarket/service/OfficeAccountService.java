@@ -43,9 +43,9 @@ public class OfficeAccountService {
             throw new BusinessException("Sub-Product is not active");
         }
 
-        // Generate account number
+        // Generate office account number using the new format
         String glNum = subProduct.getCumGLNum();
-        String accountNo = accountNumberService.generateAccountNumber(glNum);
+        String accountNo = accountNumberService.generateOfficeAccountNumber(glNum);
 
         // Map DTO to entity
         OFAcctMaster account = mapToEntity(accountRequestDTO, subProduct, accountNo, glNum);
@@ -180,8 +180,8 @@ public class OfficeAccountService {
     private OfficeAccountResponseDTO mapToResponse(OFAcctMaster entity) {
         return OfficeAccountResponseDTO.builder()
                 .accountNo(entity.getAccountNo())
-                .subProductId(entity.getSubProduct().getSubProductId())
-                .subProductName(entity.getSubProduct().getSubProductName())
+                .subProductId(entity.getSubProduct() != null ? entity.getSubProduct().getSubProductId() : null)
+                .subProductName(entity.getSubProduct() != null ? entity.getSubProduct().getSubProductName() : null)
                 .glNum(entity.getGlNum())
                 .acctName(entity.getAcctName())
                 .dateOpening(entity.getDateOpening())
