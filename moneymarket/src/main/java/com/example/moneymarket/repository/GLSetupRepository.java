@@ -24,4 +24,9 @@ public interface GLSetupRepository extends JpaRepository<GLSetup, String> {
     List<GLSetup> findChildGLsByParentGLNumOrderByLayerGLNum(String parentGLNum);
     
     List<GLSetup> findByGlName(String glName);
+    
+    // Validation queries for GL consistency
+    long countByLayerGLNum(String layerGLNum);
+    
+    long countByGlNameAndParentGLNum(String glName, String parentGLNum);
 }

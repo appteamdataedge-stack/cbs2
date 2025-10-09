@@ -50,4 +50,13 @@ public interface TranTableRepository extends JpaRepository<TranTable, String> {
     Optional<BigDecimal> sumCreditTransactionsForAccountOnDate(
             @Param("accountNo") String accountNo, 
             @Param("tranDate") LocalDate tranDate);
+    
+    /**
+     * Find transactions by account number and transaction date
+     * 
+     * @param accountNo The account number
+     * @param tranDate The transaction date
+     * @return List of transactions
+     */
+    List<TranTable> findByAccountNoAndTranDate(String accountNo, LocalDate tranDate);
 }

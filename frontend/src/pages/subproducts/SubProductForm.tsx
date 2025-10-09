@@ -30,11 +30,12 @@ const SubProductForm = () => {
   const queryClient = useQueryClient();
 
   // Form setup with react-hook-form
-  const { 
-    control, 
-    handleSubmit, 
+  const {
+    control,
+    handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors }
   } = useForm<SubProductRequestDTO>({
     defaultValues: {
@@ -122,8 +123,10 @@ const SubProductForm = () => {
     mutationFn: createSubProduct,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subproducts'] });
-      toast.success('SubProduct created successfully');
-      navigate(`/subproducts/${data.subProductId}`);
+      toast.success(`SubProduct created successfully! SubProduct ID: ${data.subProductId}`);
+      // Reset form to allow creating another subproduct
+      reset();
+      // Stay on the same page - don't navigate away
     },
     onError: (error: Error) => {
       console.error('Create sub-product error:', error);

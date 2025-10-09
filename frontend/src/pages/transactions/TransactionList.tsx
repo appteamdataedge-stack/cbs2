@@ -24,9 +24,9 @@ import {
   InputAdornment
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { getTransactionById } from '../../api/transactionService';
+import { getAllTransactions, getTransactionById } from '../../api/transactionService';
 import { DataTable, PageHeader } from '../../components/common';
 import type { Column } from '../../components/common';
 import type { TransactionLineResponseDTO, TransactionResponseDTO } from '../../types';
@@ -40,6 +40,12 @@ const TransactionList = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionResponseDTO | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  // Fetch all transactions with pagination from backend
+  const { data: transactionsData, isLoading } = useQuery({
+    queryKey: ['transactions', page, rowsPerPage],
+    queryFn: () => getAllTransactions(page, rowsPerPage),
+  });
+
   // Fetch transaction by ID if provided in route params
   const { data: transactionData } = useQuery({
     queryKey: ['transaction', tranId],
@@ -47,19 +53,21 @@ const TransactionList = () => {
     enabled: !!tranId
   });
 
-  // Mocked transaction data with BDT currency
+  // Get transactions from API response
+  const transactions = transactionsData?.content || [];
+
+  // Mocked transaction data (fallback for development - will be replaced by real data)
   const mockedTransactions: TransactionResponseDTO[] = [
     {
       tranId: 'TRX123456',
+      tranDate: '2025-01-15',
       valueDate: '2025-01-15',
-      entryDate: '2025-01-15',
-      entryTime: '14:30:00',
       narration: 'Fund transfer between accounts',
-      totalAmount: 50000.00,
-      userId: 'USER001',
+      balanced: true,
+      status: 'Entry',
       lines: [
         {
-          lineId: 1,
+          tranId: 'TRX123456-1',
           accountNo: 'ACC10001',
           accountName: 'John Doe Savings',
           drCrFlag: DrCrFlag.D,
@@ -70,7 +78,7 @@ const TransactionList = () => {
           udf1: 'Transfer to investment'
         },
         {
-          lineId: 2,
+          tranId: 'TRX123456-2',
           accountNo: 'ACC10002',
           accountName: 'John Doe Investment',
           drCrFlag: DrCrFlag.C,
@@ -84,15 +92,14 @@ const TransactionList = () => {
     },
     {
       tranId: 'TRX123457',
+      tranDate: '2025-01-14',
       valueDate: '2025-01-14',
-      entryDate: '2025-01-14',
-      entryTime: '10:15:00',
       narration: 'Deposit to account',
-      totalAmount: 25000.00,
-      userId: 'USER002',
+      balanced: true,
+      status: 'Posted',
       lines: [
         {
-          lineId: 1,
+          tranId: 'TRX123457-1',
           accountNo: 'ACC10003',
           accountName: 'Sarah Smith Savings',
           drCrFlag: DrCrFlag.C,
@@ -103,7 +110,7 @@ const TransactionList = () => {
           udf1: 'Cash deposit'
         },
         {
-          lineId: 2,
+          tranId: 'TRX123457-2',
           accountNo: 'CASH001',
           accountName: 'Cash Account',
           drCrFlag: DrCrFlag.D,
@@ -117,15 +124,14 @@ const TransactionList = () => {
     },
     {
       tranId: 'TRX123458',
+      tranDate: '2025-01-13',
       valueDate: '2025-01-13',
-      entryDate: '2025-01-13',
-      entryTime: '16:45:00',
       narration: 'Loan disbursement',
-      totalAmount: 100000.00,
-      userId: 'USER003',
+      balanced: true,
+      status: 'Verified',
       lines: [
         {
-          lineId: 1,
+          tranId: 'TRX123458-1',
           accountNo: 'ACC10004',
           accountName: 'Ahmed Hassan Current',
           drCrFlag: DrCrFlag.C,
@@ -136,7 +142,7 @@ const TransactionList = () => {
           udf1: 'Personal loan disbursement'
         },
         {
-          lineId: 2,
+          tranId: 'TRX123458-2',
           accountNo: 'LOAN001',
           accountName: 'Personal Loan Portfolio',
           drCrFlag: DrCrFlag.D,
@@ -150,15 +156,14 @@ const TransactionList = () => {
     },
     {
       tranId: 'TRX123459',
+      tranDate: '2025-01-12',
       valueDate: '2025-01-12',
-      entryDate: '2025-01-12',
-      entryTime: '11:20:00',
       narration: 'Salary payment',
-      totalAmount: 75000.00,
-      userId: 'USER004',
+      balanced: true,
+      status: 'Posted',
       lines: [
         {
-          lineId: 1,
+          tranId: 'TRX123459-1',
           accountNo: 'ACC10005',
           accountName: 'Fatima Khatun Salary',
           drCrFlag: DrCrFlag.C,
@@ -169,7 +174,7 @@ const TransactionList = () => {
           udf1: 'Monthly salary payment'
         },
         {
-          lineId: 2,
+          tranId: 'TRX123459-2',
           accountNo: 'PAY001',
           accountName: 'Payroll Account',
           drCrFlag: DrCrFlag.D,
@@ -183,15 +188,14 @@ const TransactionList = () => {
     },
     {
       tranId: 'TRX123460',
+      tranDate: '2025-01-11',
       valueDate: '2025-01-11',
-      entryDate: '2025-01-11',
-      entryTime: '09:30:00',
       narration: 'Utility bill payment',
-      totalAmount: 15000.00,
-      userId: 'USER005',
+      balanced: true,
+      status: 'Entry',
       lines: [
         {
-          lineId: 1,
+          tranId: 'TRX123460-1',
           accountNo: 'ACC10006',
           accountName: 'Rahman Electric Bill',
           drCrFlag: DrCrFlag.D,
@@ -202,7 +206,7 @@ const TransactionList = () => {
           udf1: 'Electricity bill payment'
         },
         {
-          lineId: 2,
+          tranId: 'TRX123460-2',
           accountNo: 'UTIL001',
           accountName: 'Utility Collection Account',
           drCrFlag: DrCrFlag.C,
@@ -216,42 +220,37 @@ const TransactionList = () => {
     }
   ];
   
-  // Filter transactions based on search term using mocked data
+  // Use real data from API, fallback to mock data if API returns empty
+  const dataToUse = transactions.length > 0 ? transactions : mockedTransactions;
+
+  // Filter transactions based on search term
   const filteredTransactions = useMemo(() => {
-    if (!mockedTransactions || searchTerm.trim() === '') {
-      return mockedTransactions || [];
+    if (!dataToUse || searchTerm.trim() === '') {
+      return dataToUse || [];
     }
     
     const lowerCaseSearch = searchTerm.toLowerCase();
     
-    return mockedTransactions.filter((transaction) => {
+    return dataToUse.filter((transaction) => {
       // Search in various fields
       return (
         transaction.tranId.toLowerCase().includes(lowerCaseSearch) || 
         (transaction.narration && transaction.narration.toLowerCase().includes(lowerCaseSearch)) ||
-        transaction.userId.toLowerCase().includes(lowerCaseSearch) ||
-        String(transaction.totalAmount).includes(lowerCaseSearch) ||
+        transaction.status.toLowerCase().includes(lowerCaseSearch) ||
         transaction.valueDate.includes(lowerCaseSearch) ||
-        transaction.entryDate.includes(lowerCaseSearch) ||
-        transaction.entryTime.includes(lowerCaseSearch)
+        transaction.tranDate.includes(lowerCaseSearch)
       );
     });
-  }, [searchTerm]);
+  }, [searchTerm, dataToUse]);
   
-  // Paginated data for the table
-  const paginatedData = useMemo(() => {
-    const startIndex = page * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return filteredTransactions.slice(startIndex, endIndex);
-  }, [filteredTransactions, page, rowsPerPage]);
+  // Use filtered transactions directly (backend handles pagination)
+  const paginatedData = filteredTransactions;
   
-  // Reset to first page when search changes
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm]);
+  // Total count from API or filtered results
+  const totalItems = transactionsData?.totalElements || filteredTransactions.length;
 
-  // Handle transaction data when it's loaded
-  if (transactionData && !selectedTransaction) {
+  // Handle transaction data when it's loaded (from route params)
+  if (transactionData && !selectedTransaction && dialogOpen === false) {
     setSelectedTransaction(transactionData);
     setDialogOpen(true);
   }
@@ -288,20 +287,24 @@ const TransactionList = () => {
       sortable: true
     },
     { 
-      id: 'entryDate', 
-      label: 'Entry Date', 
+      id: 'tranDate', 
+      label: 'Transaction Date', 
       minWidth: 120,
       format: (value: string) => formatDate(value)
     },
     { id: 'narration', label: 'Description', minWidth: 200 },
     { 
-      id: 'totalAmount', 
-      label: 'Amount', 
-      minWidth: 120,
-      align: 'right',
-      format: (value: number) => value.toLocaleString()
+      id: 'status', 
+      label: 'Status', 
+      minWidth: 100,
+      format: (value: string) => (
+        <Chip 
+          label={value} 
+          color={value === 'Entry' ? 'warning' : value === 'Posted' ? 'info' : 'success'}
+          size="small"
+        />
+      )
     },
-    { id: 'userId', label: 'Created By', minWidth: 120 },
     { 
       id: 'actions', 
       label: 'Actions', 
@@ -369,16 +372,16 @@ const TransactionList = () => {
           <DataTable
             columns={columns}
             rows={paginatedData}
-            totalItems={filteredTransactions.length}
+            totalItems={totalItems}
             page={page}
             rowsPerPage={rowsPerPage}
             onPageChange={setPage}
             onRowsPerPageChange={setRowsPerPage}
-            loading={false}
+            loading={isLoading}
             idField="tranId"
             emptyContent={
-              <TableCell colSpan={7} align="center">
-                No transactions found. Create your first transaction.
+              <TableCell colSpan={6} align="center">
+                {isLoading ? 'Loading transactions...' : 'No transactions found. Create your first transaction.'}
               </TableCell>
             }
           />
@@ -422,10 +425,10 @@ const TransactionList = () => {
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Entry Date/Time
+                    Transaction Date
                   </Typography>
                   <Typography variant="body1">
-                    {formatDate(selectedTransaction.entryDate)} {selectedTransaction.entryTime}
+                    {formatDate(selectedTransaction.tranDate)}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={8}>
@@ -438,10 +441,10 @@ const TransactionList = () => {
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Created By
+                    Status
                   </Typography>
                   <Typography variant="body1">
-                    {selectedTransaction.userId}
+                    {selectedTransaction.status}
                   </Typography>
                 </Grid>
               </Grid>
@@ -467,7 +470,7 @@ const TransactionList = () => {
                   </TableHead>
                   <TableBody>
                     {selectedTransaction.lines.map((line: TransactionLineResponseDTO) => (
-                      <TableRow key={line.lineId}>
+                      <TableRow key={line.tranId}>
                         <TableCell>{line.accountNo} {line.accountName && `(${line.accountName})`}</TableCell>
                         <TableCell>
                           <Chip 
@@ -490,7 +493,7 @@ const TransactionList = () => {
               {/* Totals */}
               <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                 <Typography variant="subtitle1">
-                  Total Amount: {selectedTransaction.totalAmount.toLocaleString()} BDT
+                  Transaction Status: {selectedTransaction.status} | Balanced: {selectedTransaction.balanced ? 'Yes' : 'No'}
                 </Typography>
               </Box>
             </>

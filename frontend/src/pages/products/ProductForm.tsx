@@ -29,11 +29,12 @@ const ProductForm = () => {
   const queryClient = useQueryClient();
 
   // Form setup with react-hook-form
-  const { 
-    control, 
-    handleSubmit, 
+  const {
+    control,
+    handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors }
   } = useForm<ProductRequestDTO>({
     defaultValues: {
@@ -87,8 +88,10 @@ const ProductForm = () => {
     mutationFn: createProduct,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Product created successfully');
-      navigate(`/products/${data.productId}`);
+      toast.success(`Product created successfully! Product ID: ${data.productId}`);
+      // Reset form to allow creating another product
+      reset();
+      // Stay on the same page - don't navigate away
     },
     onError: (error: Error) => {
       toast.error(`Failed to create product: ${error.message}`);

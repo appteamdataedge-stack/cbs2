@@ -17,14 +17,14 @@ import {
   Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import { useEffect, useState, useMemo } from 'react';
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { getAllCustomerAccounts } from '../../api/customerAccountService';
-import { createTransaction } from '../../api/transactionService';
+import { createTransaction, getAccountBalance } from '../../api/transactionService';
 import { FormSection, PageHeader } from '../../components/common';
-import type { CustomerAccountResponseDTO, TransactionRequestDTO } from '../../types';
+import type { CustomerAccountResponseDTO, TransactionRequestDTO, AccountBalanceDTO } from '../../types';
 import { DrCrFlag } from '../../types';
 
 // Available currencies
@@ -34,9 +34,8 @@ const TransactionForm = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState<string>('');
-  const [totalDebit, setTotalDebit] = useState<number>(0);
-  const [totalCredit, setTotalCredit] = useState<number>(0);
-  const [isBalanced, setIsBalanced] = useState<boolean>(false);
+  const [accountBalances, setAccountBalances] = useState<Map<string, AccountBalanceDTO>>(new Map());
+  const [loadingBalances, setLoadingBalances] = useState<Set<number>>(new Set());
 
   // Fetch customer accounts for dropdown
   const { data: accountsData, isLoading: isLoadingAccounts } = useQuery({
@@ -74,26 +73,47 @@ const TransactionForm = () => {
     name: 'lines'
   });
 
-  // Watch all lines to calculate totals
-  const lines = watch('lines');
+  // Watch all lines using useWatch for deep reactivity
+  const watchedLines = useWatch({
+    control,
+    name: 'lines'
+  });
 
-  // Calculate totals whenever lines change
-  useEffect(() => {
+  // Calculate totals dynamically - useMemo ensures instant updates
+  const { totalDebit, totalCredit, isBalanced } = useMemo(() => {
     let debitTotal = 0;
     let creditTotal = 0;
 
-    lines.forEach(line => {
-      if (line.drCrFlag === DrCrFlag.D && !isNaN(line.lcyAmt)) {
-        debitTotal += Number(line.lcyAmt);
-      } else if (line.drCrFlag === DrCrFlag.C && !isNaN(line.lcyAmt)) {
-        creditTotal += Number(line.lcyAmt);
+    // Use watchedLines which updates on every field change
+    const linesToCalculate = watchedLines || [];
+    
+    linesToCalculate.forEach((line: any) => {
+      // Parse the amount value, handling null, undefined, empty string, and NaN
+      const amount = parseFloat(String(line?.lcyAmt || 0));
+      const validAmount = isNaN(amount) ? 0 : amount;
+      
+      if (line?.drCrFlag === DrCrFlag.D) {
+        debitTotal += validAmount;
+      } else if (line?.drCrFlag === DrCrFlag.C) {
+        creditTotal += validAmount;
       }
     });
 
-    setTotalDebit(debitTotal);
-    setTotalCredit(creditTotal);
-    setIsBalanced(Math.abs(debitTotal - creditTotal) < 0.01); // Allow for very small rounding differences
-  }, [lines]);
+    // Round to 2 decimal places for display
+    debitTotal = Math.round(debitTotal * 100) / 100;
+    creditTotal = Math.round(creditTotal * 100) / 100;
+
+    const balanced = Math.abs(debitTotal - creditTotal) < 0.01;
+
+    // Log for debugging
+    console.log('Totals calculated:', { debitTotal, creditTotal, balanced });
+
+    return {
+      totalDebit: debitTotal,
+      totalCredit: creditTotal,
+      isBalanced: balanced
+    };
+  }, [watchedLines]);
 
   // Set current date when available
   useEffect(() => {
@@ -102,13 +122,34 @@ const TransactionForm = () => {
     }
   }, [currentDate, setValue]);
 
+  // Fetch account balance when account is selected
+  const fetchAccountBalance = async (accountNo: string, index: number) => {
+    if (!accountNo) return;
+    
+    try {
+      setLoadingBalances(prev => new Set(prev).add(index));
+      const balanceData = await getAccountBalance(accountNo);
+      setAccountBalances(prev => new Map(prev).set(`${index}`, balanceData));
+    } catch (error) {
+      console.error(`Failed to fetch balance for account ${accountNo}:`, error);
+      toast.error(`Failed to fetch balance for account ${accountNo}`);
+    } finally {
+      setLoadingBalances(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(index);
+        return newSet;
+      });
+    }
+  };
+
   // Create transaction mutation
   const createTransactionMutation = useMutation({
     mutationFn: createTransaction,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      toast.success('Transaction created successfully');
-      navigate(`/transactions/${data.tranId}`);
+      toast.success(`Transaction created successfully with status: ${data.status}. Transaction ID: ${data.tranId}`);
+      toast.info('Transaction is in Entry status. It needs to be Posted by a Checker to update balances.');
+      navigate('/transactions');
     },
     onError: (error: Error) => {
       toast.error(`Failed to create transaction: ${error.message}`);
@@ -137,6 +178,18 @@ const TransactionForm = () => {
     if (invalidLines.length > 0) {
       toast.error('All lines must have an amount greater than zero');
       return;
+    }
+
+    // Validate debit transactions don't exceed available balance
+    for (let i = 0; i < data.lines.length; i++) {
+      const line = data.lines[i];
+      if (line.drCrFlag === DrCrFlag.D) {
+        const balance = accountBalances.get(`${i}`);
+        if (balance && line.lcyAmt > balance.computedBalance) {
+          toast.error(`Insufficient balance for account ${line.accountNo}. Available: ${balance.computedBalance.toFixed(2)} BDT, Requested: ${line.lcyAmt} BDT`);
+          return;
+        }
+      }
     }
 
     // Calculate totals manually to ensure precision
@@ -170,12 +223,13 @@ const TransactionForm = () => {
     }
 
     // Ensure all numeric fields are properly formatted and rounded to 2 decimals
+    // Set FCY and Exchange Rate to match LCY since we're using BDT only
     const formattedData = {
       ...data,
       lines: data.lines.map(line => ({
         ...line,
-        fcyAmt: Math.round((Number(line.fcyAmt) || 0) * 100) / 100,
-        exchangeRate: Number(line.exchangeRate) || 1,
+        fcyAmt: Math.round((Number(line.lcyAmt) || 0) * 100) / 100, // FCY = LCY for BDT
+        exchangeRate: 1, // Always 1 for local currency
         lcyAmt: Math.round((Number(line.lcyAmt) || 0) * 100) / 100
       }))
     };
@@ -283,6 +337,11 @@ const TransactionForm = () => {
                           {...field}
                           labelId={`account-label-${index}`}
                           label="Account"
+                          onChange={(e) => {
+                            field.onChange(e);
+                            // Fetch balance when account is selected
+                            fetchAccountBalance(e.target.value as string, index);
+                          }}
                         >
                           {accountsData?.content.map((account: CustomerAccountResponseDTO) => (
                             <MenuItem key={account.accountNo} value={account.accountNo}>
@@ -293,6 +352,36 @@ const TransactionForm = () => {
                         <FormHelperText>{errors.lines?.[index]?.accountNo?.message}</FormHelperText>
                       </FormControl>
                     )}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Balance"
+                    type="text"
+                    fullWidth
+                    value={accountBalances.get(`${index}`)?.computedBalance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                    InputProps={{
+                      readOnly: true,
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          BDT
+                        </InputAdornment>
+                      ),
+                      endAdornment: loadingBalances.has(index) ? (
+                        <InputAdornment position="end">
+                          <CircularProgress size={20} />
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                    disabled={true}
+                    helperText="Available balance for this account"
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        backgroundColor: '#f5f5f5',
+                        fontWeight: 'bold'
+                      }
+                    }}
                   />
                 </Grid>
 
@@ -396,40 +485,54 @@ const TransactionForm = () => {
                       required: 'LCY Amount is required',
                       min: { value: 0.01, message: 'Amount must be greater than zero' }
                     }}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="Amount LCY"
-                        type="number"
-                        fullWidth
-                        required
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              BDT
-                            </InputAdornment>
-                          ),
-                        }}
-                        onChange={(e) => {
-                          const inputValue = e.target.value;
-                          // Allow empty string for clearing the field
-                          if (inputValue === '') {
-                            field.onChange(0);
-                            setValue(`lines.${index}.fcyAmt`, 0);
-                            return;
+                    render={({ field }) => {
+                      const currentLine = watchedLines?.[index];
+                      const balance = accountBalances.get(`${index}`);
+                      const isDebit = currentLine?.drCrFlag === DrCrFlag.D;
+                      const exceedsBalance = isDebit && balance && field.value > balance.computedBalance;
+                      
+                      return (
+                        <TextField
+                          {...field}
+                          label="Amount LCY"
+                          type="number"
+                          fullWidth
+                          required
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                BDT
+                              </InputAdornment>
+                            ),
+                          }}
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            // Allow empty string for clearing the field
+                            if (inputValue === '' || inputValue === null || inputValue === undefined) {
+                              field.onChange(0);
+                              setValue(`lines.${index}.fcyAmt`, 0);
+                              return;
+                            }
+                            const value = parseFloat(inputValue);
+                            const finalValue = isNaN(value) ? 0 : value;
+                            
+                            // Update both LCY and FCY amounts
+                            field.onChange(finalValue);
+                            setValue(`lines.${index}.fcyAmt`, finalValue);
+                            
+                            // Force form re-render to update totals
+                            console.log(`Amount updated for line ${index}: ${finalValue}`);
+                          }}
+                          error={!!errors.lines?.[index]?.lcyAmt || exceedsBalance}
+                          helperText={
+                            exceedsBalance 
+                              ? `⚠️ Insufficient balance! Available: ${balance.computedBalance.toFixed(2)} BDT`
+                              : errors.lines?.[index]?.lcyAmt?.message
                           }
-                          const value = parseFloat(inputValue);
-                          if (!isNaN(value)) {
-                            field.onChange(value);
-                            // For now, since exchange rate is 1 and currency is BDT, FCY equals LCY
-                            setValue(`lines.${index}.fcyAmt`, value);
-                          }
-                        }}
-                        error={!!errors.lines?.[index]?.lcyAmt}
-                        helperText={errors.lines?.[index]?.lcyAmt?.message}
-                        disabled={isLoading}
-                      />
-                    )}
+                          disabled={isLoading}
+                        />
+                      );
+                    }}
                   />
                 </Grid>
 
@@ -453,25 +556,69 @@ const TransactionForm = () => {
             </Box>
           ))}
 
-          {/* Transaction Totals */}
-          <Paper variant="outlined" sx={{ p: 2, mt: 2, backgroundColor: '#f9f9f9' }}>
+          {/* Transaction Totals - Updates Instantly as you type */}
+          <Paper 
+            variant="outlined" 
+            sx={{ 
+              p: 3, 
+              mt: 2, 
+              backgroundColor: isBalanced ? '#e8f5e9' : '#fff3e0',
+              border: 2,
+              borderColor: isBalanced ? 'success.main' : 'warning.main',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+              Transaction Summary (Updates Instantly)
+            </Typography>
             <Grid container spacing={2}>
               <Grid item xs={12} md={4}>
-                <Typography variant="subtitle1">Total Debit:</Typography>
-                <Typography variant="h6">{totalDebit.toLocaleString()} BDT</Typography>
+                <Typography variant="subtitle1" fontWeight="bold" color="text.secondary">
+                  Total Debit:
+                </Typography>
+                <Typography 
+                  variant="h6" 
+                  color="primary.main"
+                  sx={{ 
+                    fontWeight: 'bold',
+                    fontSize: '1.5rem',
+                    transition: 'color 0.3s ease'
+                  }}
+                >
+                  {totalDebit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BDT
+                </Typography>
               </Grid>
               <Grid item xs={12} md={4}>
-                <Typography variant="subtitle1">Total Credit:</Typography>
-                <Typography variant="h6">{totalCredit.toLocaleString()} BDT</Typography>
+                <Typography variant="subtitle1" fontWeight="bold" color="text.secondary">
+                  Total Credit:
+                </Typography>
+                <Typography 
+                  variant="h6" 
+                  color="secondary.main"
+                  sx={{ 
+                    fontWeight: 'bold',
+                    fontSize: '1.5rem',
+                    transition: 'color 0.3s ease'
+                  }}
+                >
+                  {totalCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BDT
+                </Typography>
               </Grid>
               <Grid item xs={12} md={4}>
-                <Typography variant="subtitle1">Difference:</Typography>
+                <Typography variant="subtitle1" fontWeight="bold" color="text.secondary">
+                  Difference:
+                </Typography>
                 <Typography 
                   variant="h6" 
                   color={isBalanced ? 'success.main' : 'error.main'}
+                  sx={{ 
+                    fontWeight: 'bold',
+                    fontSize: '1.5rem',
+                    transition: 'color 0.3s ease'
+                  }}
                 >
-                  {Math.abs(totalDebit - totalCredit).toLocaleString()} BDT
-                  {isBalanced && ' (Balanced)'}
+                  {Math.abs(totalDebit - totalCredit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BDT
+                  {isBalanced && ' ✓'}
                 </Typography>
               </Grid>
             </Grid>
@@ -499,7 +646,7 @@ const TransactionForm = () => {
             disabled={isLoading || !isBalanced || fields.length < 2}
             startIcon={isLoading ? <CircularProgress size={20} /> : <SaveIcon />}
           >
-            Create Transaction
+            Create Transaction (Entry)
           </Button>
         </Box>
       </form>

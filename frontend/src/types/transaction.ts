@@ -28,7 +28,7 @@ export interface TransactionRequestDTO {
 
 // Transaction line response DTO
 export interface TransactionLineResponseDTO {
-  lineId: number;
+  tranId: string;
   accountNo: string;
   accountName?: string;
   drCrFlag: DrCrFlag;
@@ -39,14 +39,31 @@ export interface TransactionLineResponseDTO {
   udf1?: string;
 }
 
+// Transaction status enum
+export enum TransactionStatus {
+  Entry = 'Entry',
+  Posted = 'Posted',
+  Verified = 'Verified'
+}
+
 // Transaction response DTO
 export interface TransactionResponseDTO {
   tranId: string;
+  tranDate: string; // ISO date string
   valueDate: string; // ISO date string
-  entryDate: string; // ISO date string
-  entryTime: string; // ISO time string
   narration?: string;
-  totalAmount: number;
-  userId: string;
   lines: TransactionLineResponseDTO[];
+  balanced: boolean;
+  status: string;
+}
+
+// Account balance DTO
+export interface AccountBalanceDTO {
+  accountNo: string;
+  accountName: string;
+  availableBalance: number;
+  currentBalance: number;
+  todayDebits: number;
+  todayCredits: number;
+  computedBalance: number;
 }

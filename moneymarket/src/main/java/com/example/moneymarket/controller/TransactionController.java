@@ -6,6 +6,10 @@ import com.example.moneymarket.service.TransactionService;
 import com.example.moneymarket.validation.TransactionValidator;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -31,6 +35,36 @@ public class TransactionController {
     @InitBinder("transactionRequestDTO")
     public void initBinder(WebDataBinder binder) {
         binder.addValidators(transactionValidator);
+    }
+
+    /**
+     * Get all transactions with pagination
+     * 
+     * @param page The page number (default 0)
+     * @param size The page size (default 10)
+     * @param sort The sort field (optional)
+     * @return Page of transactions
+     */
+    @GetMapping
+    public ResponseEntity<Page<TransactionResponseDTO>> getAllTransactions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String sort) {
+        
+        Pageable pageable;
+        if (sort != null && !sort.isEmpty()) {
+            String[] sortParams = sort.split(",");
+            String field = sortParams[0];
+            Sort.Direction direction = sortParams.length > 1 && sortParams[1].equalsIgnoreCase("desc") 
+                    ? Sort.Direction.DESC 
+                    : Sort.Direction.ASC;
+            pageable = PageRequest.of(page, size, Sort.by(direction, field));
+        } else {
+            pageable = PageRequest.of(page, size);
+        }
+        
+        Page<TransactionResponseDTO> transactions = transactionService.getAllTransactions(pageable);
+        return ResponseEntity.ok(transactions);
     }
 
     /**
@@ -63,5 +97,47 @@ public class TransactionController {
     public ResponseEntity<TransactionResponseDTO> getTransaction(@PathVariable String tranId) {
         TransactionResponseDTO transaction = transactionService.getTransaction(tranId);
         return ResponseEntity.ok(transaction);
+    }
+
+    /**
+     * Post a transaction (Checker approves Maker's entry)
+     * Moves transaction from Entry to Posted status and updates balances
+     * 
+     * @param tranId The transaction ID
+     * @return The posted transaction
+     */
+    @PostMapping("/{tranId}/post")
+    public ResponseEntity<TransactionResponseDTO> postTransaction(@PathVariable String tranId) {
+        TransactionResponseDTO postedTransaction = transactionService.postTransaction(tranId);
+        return ResponseEntity.ok(postedTransaction);
+    }
+
+    /**
+     * Verify a transaction (Final approval)
+     * Moves transaction from Posted to Verified status
+     * 
+     * @param tranId The transaction ID
+     * @return The verified transaction
+     */
+    @PostMapping("/{tranId}/verify")
+    public ResponseEntity<TransactionResponseDTO> verifyTransaction(@PathVariable String tranId) {
+        TransactionResponseDTO verifiedTransaction = transactionService.verifyTransaction(tranId);
+        return ResponseEntity.ok(verifiedTransaction);
+    }
+
+    /**
+     * Reverse a transaction
+     * Creates opposite entries to reverse the original transaction
+     * 
+     * @param tranId The transaction ID to reverse
+     * @param reason The reason for reversal
+     * @return The reversal transaction
+     */
+    @PostMapping("/{tranId}/reverse")
+    public ResponseEntity<TransactionResponseDTO> reverseTransaction(
+            @PathVariable String tranId,
+            @RequestParam(required = false, defaultValue = "Manual reversal") String reason) {
+        TransactionResponseDTO reversalTransaction = transactionService.reverseTransaction(tranId, reason);
+        return ResponseEntity.ok(reversalTransaction);
     }
 }

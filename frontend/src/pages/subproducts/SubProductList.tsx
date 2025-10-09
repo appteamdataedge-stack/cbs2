@@ -47,7 +47,8 @@ const SubProductList = () => {
         String(subProduct.productId).includes(lowerCaseSearch) ||
         (subProduct.productName && subProduct.productName.toLowerCase().includes(lowerCaseSearch)) ||
         (subProduct.makerId && subProduct.makerId.toLowerCase().includes(lowerCaseSearch)) ||
-        (subProduct.inttCode && subProduct.inttCode.toLowerCase().includes(lowerCaseSearch))
+        (subProduct.inttCode && subProduct.inttCode.toLowerCase().includes(lowerCaseSearch)) ||
+        (subProduct.subProductStatus && subProduct.subProductStatus.toLowerCase().includes(lowerCaseSearch))
       );
     });
   }, [allSubProducts, searchTerm]);
@@ -126,7 +127,7 @@ const SubProductList = () => {
       format: (value: number | null | undefined) => (value !== null && value !== undefined) ? `${value.toFixed(2)}%` : 'N/A'
     },
     { 
-      id: 'status', 
+      id: 'subProductStatus', 
       label: 'Status', 
       minWidth: 100,
       format: (value: SubProductStatus | null | undefined) => (

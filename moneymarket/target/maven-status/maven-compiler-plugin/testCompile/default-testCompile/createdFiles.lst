@@ -2,4 +2,5 @@ com\example\moneymarket\controller\TransactionControllerTest$TestConfig.class
 com\example\moneymarket\service\CustomerServiceTest.class
 com\example\moneymarket\controller\TransactionControllerTest.class
 com\example\moneymarket\service\AccountNumberServiceTest.class
+com\example\moneymarket\integration\CustomerAccountIntegrationTest.class
 com\example\moneymarket\controller\TransactionControllerTest$TestConfig$1.class

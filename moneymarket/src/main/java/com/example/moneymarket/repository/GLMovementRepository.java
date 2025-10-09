@@ -19,4 +19,6 @@ public interface GLMovementRepository extends JpaRepository<GLMovement, Long> {
     List<GLMovement> findByValueDate(LocalDate valueDate);
     
     List<GLMovement> findByGlSetupGlNumAndTranDateBetween(String glNum, LocalDate startDate, LocalDate endDate);
+    
+    List<GLMovement> findByGlSetupAndTranDate(com.example.moneymarket.entity.GLSetup glSetup, LocalDate tranDate);
 }

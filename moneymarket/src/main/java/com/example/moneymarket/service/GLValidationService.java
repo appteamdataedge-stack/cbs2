@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * Service for GL mapping and validation
  * 
@@ -99,8 +101,10 @@ public class GLValidationService {
                     " must have parent GL " + productGlNum + " but has " + glSetup.getParentGLNum());
         }
         
-        // Validate GL uniqueness constraints
-        validateGLUniqueness(glSetup);
+        // Note: GL uniqueness validation is NOT needed here because:
+        // - Subproduct is referencing an EXISTING GL, not creating a new one
+        // - GL uniqueness is enforced by the database primary key constraint on GL_Num
+        // - The GL was already validated when it was created in GL_Setup
     }
     
     /**
@@ -160,23 +164,147 @@ public class GLValidationService {
     }
     
     /**
-     * Validate GL uniqueness constraints
-     * - One GL_Name cannot have two Parent_GL_Num
-     * - GL_Num must be unique
+     * Validate GL uniqueness constraints when CREATING a new GL
+     * This should only be called when creating a new GL_Setup record, NOT when referencing existing GLs
      * 
      * @param glSetup The GL setup to validate
-     * @throws BusinessException if uniqueness constraints are violated
+     * @param isNewGL Whether this is a new GL being created (true) or existing GL being referenced (false)
+     * @throws BusinessException if validation fails
      */
-    private void validateGLUniqueness(GLSetup glSetup) {
-        // Check for duplicate GL_Name with different Parent_GL_Num
-        java.util.List<GLSetup> existingGLs = glSetupRepository.findByGlName(glSetup.getGlName());
+    public void validateGLUniqueness(GLSetup glSetup, boolean isNewGL) {
+        if (!isNewGL) {
+            // Skip uniqueness validation if we're just referencing an existing GL
+            return;
+        }
+        
+        // Check if Layer_GL_Num is unique (only for new GLs)
+        long countByLayerGlNum = glSetupRepository.countByLayerGLNum(glSetup.getLayerGLNum());
+        if (countByLayerGlNum > 0) {
+            throw new BusinessException("Layer_GL_Num " + glSetup.getLayerGLNum() + " is not unique");
+        }
+        
+        // Check if GL_Num is unique (handled by primary key constraint)
+        // No need to explicitly validate as database enforces this
+        
+        // Check if GL_Name with same Parent_GL_Num combination is unique
+        List<GLSetup> existingGLs = glSetupRepository.findByGlName(glSetup.getGlName());
         for (GLSetup existing : existingGLs) {
             if (!existing.getGlNum().equals(glSetup.getGlNum()) && 
-                !existing.getParentGLNum().equals(glSetup.getParentGLNum())) {
-                throw new BusinessException("GL Name '" + glSetup.getGlName() + 
-                    "' already exists with different Parent GL Number. " +
-                    "One GL Name cannot have multiple Parent GL Numbers.");
+                existing.getParentGLNum() != null && 
+                existing.getParentGLNum().equals(glSetup.getParentGLNum())) {
+                throw new BusinessException("GL_Name " + glSetup.getGlName() + 
+                        " with Parent_GL_Num " + glSetup.getParentGLNum() + " is not unique");
             }
+        }
+    }
+    
+    /**
+     * Validate GL field lengths
+     * 
+     * @param glSetup The GL setup to validate
+     * @throws BusinessException if validation fails
+     */
+    public void validateGLFieldLengths(GLSetup glSetup) {
+        // Validate Layer_Id length (1 digit)
+        if (glSetup.getLayerId() < 0 || glSetup.getLayerId() > 9) {
+            throw new BusinessException("Layer_Id must be between 0 and 9");
+        }
+        
+        // Validate Layer_GL_Num length based on Layer_Id
+        int expectedLayerGLNumLength;
+        switch (glSetup.getLayerId()) {
+            case 0:
+                expectedLayerGLNumLength = 9;
+                break;
+            case 1:
+                expectedLayerGLNumLength = 8;
+                break;
+            case 2:
+                expectedLayerGLNumLength = 7;
+                break;
+            case 3:
+                expectedLayerGLNumLength = 5;
+                break;
+            case 4:
+                expectedLayerGLNumLength = 3;
+                break;
+            default:
+                throw new BusinessException("Invalid Layer_Id: " + glSetup.getLayerId());
+        }
+        
+        if (glSetup.getLayerGLNum().length() != expectedLayerGLNumLength) {
+            throw new BusinessException("Layer_GL_Num length must be " + expectedLayerGLNumLength + 
+                    " for Layer " + glSetup.getLayerId() + ", but is " + glSetup.getLayerGLNum().length());
+        }
+        
+        // Validate Parent_GL_Num length (9 digits)
+        if (glSetup.getParentGLNum() != null && glSetup.getParentGLNum().length() != 9) {
+            throw new BusinessException("Parent_GL_Num must be 9 digits, but is " + glSetup.getParentGLNum().length());
+        }
+        
+        // Validate GL_Num length (9 digits)
+        if (glSetup.getGlNum().length() != 9) {
+            throw new BusinessException("GL_Num must be 9 digits, but is " + glSetup.getGlNum().length());
+        }
+    }
+    
+    /**
+     * Get GL type based on first digit
+     * 
+     * @param glNum The GL number
+     * @return The GL type (Asset, Liability, Equity, Income, Expense)
+     */
+    public String getGLType(String glNum) {
+        if (glNum == null || glNum.isEmpty()) {
+            return "Unknown";
+        }
+        
+        char firstDigit = glNum.charAt(0);
+        switch (firstDigit) {
+            case '1':
+                return "Asset";
+            case '2':
+                return "Liability";
+            case '3':
+                return "Equity";
+            case '4':
+                return "Income";
+            case '5':
+                return "Expense";
+            default:
+                return "Unknown";
+        }
+    }
+    
+    /**
+     * Validate parent-child GL hierarchy consistency
+     * 
+     * @param childGlNum The child GL number
+     * @param parentGlNum The parent GL number
+     * @throws BusinessException if validation fails
+     */
+    public void validateGLHierarchy(String childGlNum, String parentGlNum) {
+        if (childGlNum == null || parentGlNum == null) {
+            throw new BusinessException("Child and parent GL numbers cannot be null");
+        }
+        
+        // Both must exist
+        GLSetup childGL = glSetupRepository.findById(childGlNum)
+                .orElseThrow(() -> new BusinessException("Child GL " + childGlNum + " does not exist"));
+        
+        GLSetup parentGL = glSetupRepository.findById(parentGlNum)
+                .orElseThrow(() -> new BusinessException("Parent GL " + parentGlNum + " does not exist"));
+        
+        // Parent layer must be less than child layer
+        if (parentGL.getLayerId() >= childGL.getLayerId()) {
+            throw new BusinessException("Parent GL layer (" + parentGL.getLayerId() + 
+                    ") must be less than child GL layer (" + childGL.getLayerId() + ")");
+        }
+        
+        // Child's parent_gl_num must match parent's gl_num
+        if (!childGL.getParentGLNum().equals(parentGL.getGlNum())) {
+            throw new BusinessException("Child GL's parent_gl_num (" + childGL.getParentGLNum() + 
+                    ") does not match parent GL's gl_num (" + parentGL.getGlNum() + ")");
         }
     }
 }

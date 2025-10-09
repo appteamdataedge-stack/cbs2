@@ -22,13 +22,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -44,11 +45,12 @@ public class TransactionService {
     private final GLMovementRepository glMovementRepository;
     private final GLSetupRepository glSetupRepository;
     private final BalanceService balanceService;
+    private final TransactionValidationService validationService;
 
     private final Random random = new Random();
 
     /**
-     * Create a new transaction
+     * Create a new transaction with Entry status (Maker-Checker workflow)
      * 
      * @param transactionRequestDTO The transaction data
      * @return The created transaction response
@@ -58,15 +60,25 @@ public class TransactionService {
         // Validate transaction balance
         validateTransactionBalance(transactionRequestDTO);
         
+        // Validate all debit transactions have sufficient balance
+        for (TransactionLineDTO lineDTO : transactionRequestDTO.getLines()) {
+            if (lineDTO.getDrCrFlag() == DrCrFlag.D) {
+                boolean isValid = validationService.validateDebitTransaction(
+                        lineDTO.getAccountNo(), lineDTO.getLcyAmt());
+                if (!isValid) {
+                    throw new BusinessException("Insufficient balance for account: " + lineDTO.getAccountNo());
+                }
+            }
+        }
+        
         // Generate a transaction ID
         String tranId = generateTransactionId();
         LocalDate tranDate = LocalDate.now();
         LocalDate valueDate = transactionRequestDTO.getValueDate();
         
         List<TranTable> transactions = new ArrayList<>();
-        List<GLMovement> glMovements = new ArrayList<>();
         
-        // Process each transaction line
+        // Process each transaction line - create in Entry status
         int lineNumber = 1;
         for (TransactionLineDTO lineDTO : transactionRequestDTO.getLines()) {
             // Validate account exists
@@ -80,14 +92,14 @@ public class TransactionService {
                     " sub-product: " + account.getSubProduct().getSubProductName());
             }
             
-            // Create transaction record
+            // Create transaction record with Entry status
             String lineId = tranId + "-" + lineNumber++;
             TranTable transaction = TranTable.builder()
                     .tranId(lineId)
                     .tranDate(tranDate)
                     .valueDate(valueDate)
                     .drCrFlag(lineDTO.getDrCrFlag())
-                    .tranStatus(TranStatus.Entry)  // Initial status is Entry
+                    .tranStatus(TranStatus.Entry)  // Initial status is Entry (Maker)
                     .accountNo(lineDTO.getAccountNo())
                     .tranCcy(lineDTO.getTranCcy())
                     .fcyAmt(lineDTO.getFcyAmt())
@@ -100,46 +112,274 @@ public class TransactionService {
                     .build();
             
             transactions.add(transaction);
+        }
+        
+        // Save all transaction lines
+        tranTableRepository.saveAll(transactions);
+        
+        // Create response
+        TransactionResponseDTO response = buildTransactionResponse(tranId, tranDate, valueDate, 
+                transactionRequestDTO.getNarration(), transactions);
+        
+        log.info("Transaction created with ID: {} in Entry status", tranId);
+        return response;
+    }
+
+    /**
+     * Post a transaction (move from Entry to Posted status)
+     * This updates balances and creates GL movements
+     * 
+     * @param tranId The transaction ID
+     * @return The updated transaction response
+     */
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public TransactionResponseDTO postTransaction(String tranId) {
+        // Find all transaction lines with Entry status
+        List<TranTable> transactions = tranTableRepository.findAll().stream()
+                .filter(t -> t.getTranId().startsWith(tranId + "-") && t.getTranStatus() == TranStatus.Entry)
+                .collect(Collectors.toList());
+        
+        if (transactions.isEmpty()) {
+            throw new ResourceNotFoundException("Transaction", "ID", tranId);
+        }
+        
+        // Validate again before posting
+        BigDecimal totalDebit = transactions.stream()
+                .filter(t -> t.getDrCrFlag() == DrCrFlag.D)
+                .map(TranTable::getLcyAmt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal totalCredit = transactions.stream()
+                .filter(t -> t.getDrCrFlag() == DrCrFlag.C)
+                .map(TranTable::getLcyAmt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        if (totalDebit.compareTo(totalCredit) != 0) {
+            throw new BusinessException("Cannot post unbalanced transaction");
+        }
+        
+        // Validate all debit transactions again before posting
+        for (TranTable transaction : transactions) {
+            if (transaction.getDrCrFlag() == DrCrFlag.D) {
+                boolean isValid = validationService.validateDebitTransaction(
+                        transaction.getAccountNo(), transaction.getLcyAmt());
+                if (!isValid) {
+                    throw new BusinessException("Insufficient balance for account: " + transaction.getAccountNo());
+                }
+            }
+        }
+        
+        List<GLMovement> glMovements = new ArrayList<>();
+        
+        // Process each transaction line - update balances and create GL movements
+        for (TranTable transaction : transactions) {
+            // Update status to Posted
+            transaction.setTranStatus(TranStatus.Posted);
             
             // Get GL number from account
+            CustAcctMaster account = custAcctMasterRepository.findById(transaction.getAccountNo())
+                    .orElseThrow(() -> new ResourceNotFoundException("Account", "Account Number", transaction.getAccountNo()));
+            
             String glNum = account.getGlNum();
             GLSetup glSetup = glSetupRepository.findById(glNum)
                     .orElseThrow(() -> new ResourceNotFoundException("GL", "GL Number", glNum));
             
             // Update account balance
-            BigDecimal newBalance = balanceService.updateAccountBalance(
-                    lineDTO.getAccountNo(), lineDTO.getDrCrFlag(), lineDTO.getLcyAmt());
+            balanceService.updateAccountBalance(
+                    transaction.getAccountNo(), transaction.getDrCrFlag(), transaction.getLcyAmt());
             
             // Update GL balance
             BigDecimal newGLBalance = balanceService.updateGLBalance(
-                    glNum, lineDTO.getDrCrFlag(), lineDTO.getLcyAmt());
+                    glNum, transaction.getDrCrFlag(), transaction.getLcyAmt());
             
             // Create GL movement record
             GLMovement glMovement = GLMovement.builder()
                     .transaction(transaction)
                     .glSetup(glSetup)
-                    .drCrFlag(lineDTO.getDrCrFlag())
-                    .tranDate(tranDate)
-                    .valueDate(valueDate)
-                    .amount(lineDTO.getLcyAmt())
+                    .drCrFlag(transaction.getDrCrFlag())
+                    .tranDate(transaction.getTranDate())
+                    .valueDate(transaction.getValueDate())
+                    .amount(transaction.getLcyAmt())
                     .balanceAfter(newGLBalance)
                     .build();
             
             glMovements.add(glMovement);
         }
         
-        // Save all transaction lines
+        // Save updated transaction status
         tranTableRepository.saveAll(transactions);
         
         // Save all GL movements
         glMovementRepository.saveAll(glMovements);
         
-        // Create response
-        TransactionResponseDTO response = buildTransactionResponse(tranId, tranDate, valueDate, 
-                transactionRequestDTO.getNarration(), transactions);
+        TranTable firstLine = transactions.get(0);
+        TransactionResponseDTO response = buildTransactionResponse(tranId, firstLine.getTranDate(), 
+                firstLine.getValueDate(), firstLine.getNarration(), transactions);
         
-        log.info("Transaction created with ID: {}", tranId);
+        log.info("Transaction posted with ID: {}", tranId);
         return response;
+    }
+
+    /**
+     * Verify a transaction (move from Posted to Verified status)
+     * 
+     * @param tranId The transaction ID
+     * @return The updated transaction response
+     */
+    @Transactional
+    public TransactionResponseDTO verifyTransaction(String tranId) {
+        // Find all transaction lines with Posted status
+        List<TranTable> transactions = tranTableRepository.findAll().stream()
+                .filter(t -> t.getTranId().startsWith(tranId + "-") && t.getTranStatus() == TranStatus.Posted)
+                .collect(Collectors.toList());
+        
+        if (transactions.isEmpty()) {
+            throw new ResourceNotFoundException("Transaction", "ID", tranId);
+        }
+        
+        // Update status to Verified
+        transactions.forEach(t -> t.setTranStatus(TranStatus.Verified));
+        tranTableRepository.saveAll(transactions);
+        
+        TranTable firstLine = transactions.get(0);
+        TransactionResponseDTO response = buildTransactionResponse(tranId, firstLine.getTranDate(), 
+                firstLine.getValueDate(), firstLine.getNarration(), transactions);
+        
+        log.info("Transaction verified with ID: {}", tranId);
+        return response;
+    }
+
+    /**
+     * Reverse a transaction by creating opposite entries
+     * 
+     * @param tranId The original transaction ID to reverse
+     * @param reason The reason for reversal
+     * @return The reversal transaction response
+     */
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public TransactionResponseDTO reverseTransaction(String tranId, String reason) {
+        // Find all transaction lines of the original transaction
+        List<TranTable> originalTransactions = tranTableRepository.findAll().stream()
+                .filter(t -> t.getTranId().startsWith(tranId + "-"))
+                .collect(Collectors.toList());
+        
+        if (originalTransactions.isEmpty()) {
+            throw new ResourceNotFoundException("Transaction", "ID", tranId);
+        }
+        
+        // Generate reversal transaction ID
+        String reversalTranId = generateTransactionId();
+        LocalDate tranDate = LocalDate.now();
+        LocalDate valueDate = originalTransactions.get(0).getValueDate();
+        
+        List<TranTable> reversalTransactions = new ArrayList<>();
+        List<GLMovement> glMovements = new ArrayList<>();
+        
+        // Create opposite entries
+        int lineNumber = 1;
+        for (TranTable original : originalTransactions) {
+            // Create opposite entry
+            DrCrFlag oppositeDrCr = original.getDrCrFlag() == DrCrFlag.D ? DrCrFlag.C : DrCrFlag.D;
+            
+            String lineId = reversalTranId + "-" + lineNumber++;
+            TranTable reversalTran = TranTable.builder()
+                    .tranId(lineId)
+                    .tranDate(tranDate)
+                    .valueDate(valueDate)
+                    .drCrFlag(oppositeDrCr)
+                    .tranStatus(TranStatus.Verified) // Reversals are auto-verified
+                    .accountNo(original.getAccountNo())
+                    .tranCcy(original.getTranCcy())
+                    .fcyAmt(original.getFcyAmt())
+                    .exchangeRate(original.getExchangeRate())
+                    .lcyAmt(original.getLcyAmt())
+                    .debitAmount(oppositeDrCr == DrCrFlag.D ? original.getLcyAmt() : BigDecimal.ZERO)
+                    .creditAmount(oppositeDrCr == DrCrFlag.C ? original.getLcyAmt() : BigDecimal.ZERO)
+                    .narration("REVERSAL: " + reason + " (Original: " + original.getTranId() + ")")
+                    .pointingId(original.getPointingId()) // Link to original
+                    .udf1(original.getUdf1())
+                    .build();
+            
+            reversalTransactions.add(reversalTran);
+            
+            // Get GL number from account
+            CustAcctMaster account = custAcctMasterRepository.findById(original.getAccountNo())
+                    .orElseThrow(() -> new ResourceNotFoundException("Account", "Account Number", original.getAccountNo()));
+            
+            String glNum = account.getGlNum();
+            GLSetup glSetup = glSetupRepository.findById(glNum)
+                    .orElseThrow(() -> new ResourceNotFoundException("GL", "GL Number", glNum));
+            
+            // Update account balance (opposite direction)
+            balanceService.updateAccountBalance(
+                    original.getAccountNo(), oppositeDrCr, original.getLcyAmt());
+            
+            // Update GL balance (opposite direction)
+            BigDecimal newGLBalance = balanceService.updateGLBalance(
+                    glNum, oppositeDrCr, original.getLcyAmt());
+            
+            // Create GL movement record
+            GLMovement glMovement = GLMovement.builder()
+                    .transaction(reversalTran)
+                    .glSetup(glSetup)
+                    .drCrFlag(oppositeDrCr)
+                    .tranDate(tranDate)
+                    .valueDate(valueDate)
+                    .amount(original.getLcyAmt())
+                    .balanceAfter(newGLBalance)
+                    .build();
+            
+            glMovements.add(glMovement);
+        }
+        
+        // Save all reversal transaction lines
+        tranTableRepository.saveAll(reversalTransactions);
+        
+        // Save all GL movements
+        glMovementRepository.saveAll(glMovements);
+        
+        TransactionResponseDTO response = buildTransactionResponse(reversalTranId, tranDate, valueDate, 
+                "REVERSAL: " + reason, reversalTransactions);
+        
+        log.info("Transaction reversed. Original ID: {}, Reversal ID: {}", tranId, reversalTranId);
+        return response;
+    }
+
+    /**
+     * Get all transactions with pagination
+     * Groups transaction lines by base transaction ID
+     * 
+     * @param pageable The pagination information
+     * @return Page of transaction responses
+     */
+    public Page<TransactionResponseDTO> getAllTransactions(Pageable pageable) {
+        // Get all transaction lines
+        List<TranTable> allTransactions = tranTableRepository.findAll();
+        
+        // Group by base transaction ID (remove line number suffix)
+        Map<String, List<TranTable>> groupedTransactions = allTransactions.stream()
+                .collect(Collectors.groupingBy(t -> extractBaseTranId(t.getTranId())));
+        
+        // Convert to response DTOs
+        List<TransactionResponseDTO> allResponses = groupedTransactions.entrySet().stream()
+                .map(entry -> {
+                    String baseTranId = entry.getKey();
+                    List<TranTable> lines = entry.getValue();
+                    TranTable firstLine = lines.get(0);
+                    return buildTransactionResponse(baseTranId, firstLine.getTranDate(), 
+                            firstLine.getValueDate(), firstLine.getNarration(), lines);
+                })
+                .sorted((a, b) -> b.getTranDate().compareTo(a.getTranDate())) // Sort by date descending
+                .collect(Collectors.toList());
+        
+        // Apply pagination
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), allResponses.size());
+        List<TransactionResponseDTO> pageContent = start < allResponses.size() 
+                ? allResponses.subList(start, end) 
+                : new ArrayList<>();
+        
+        return new PageImpl<>(pageContent, pageable, allResponses.size());
     }
 
     /**
@@ -165,6 +405,18 @@ public class TransactionService {
         return buildTransactionResponse(tranId, firstLine.getTranDate(), firstLine.getValueDate(), 
                 firstLine.getNarration(), transactions);
     }
+    
+    /**
+     * Extract base transaction ID (remove line number suffix)
+     * Example: "T20251009123456-1" → "T20251009123456"
+     * 
+     * @param fullTranId The full transaction ID with line number
+     * @return The base transaction ID
+     */
+    private String extractBaseTranId(String fullTranId) {
+        int lastDashIndex = fullTranId.lastIndexOf('-');
+        return lastDashIndex > 0 ? fullTranId.substring(0, lastDashIndex) : fullTranId;
+    }
 
     /**
      * Validate that the transaction is balanced (debit equals credit)
@@ -188,17 +440,22 @@ public class TransactionService {
     }
 
     /**
-     * Generate a unique transaction ID
+     * Generate a unique transaction ID (max 20 characters)
+     * Format: TyyyyMMddHHmmssSSS (20 chars max)
+     * Example: T20251009120530123
      * 
      * @return The transaction ID
      */
     private String generateTransactionId() {
         LocalDate now = LocalDate.now();
         String date = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String timestamp = String.valueOf(System.currentTimeMillis()).substring(6);
+        // Get current time in milliseconds and use last 6 digits
+        long millis = System.currentTimeMillis();
+        String timeComponent = String.format("%06d", millis % 1000000);
         String randomPart = String.format("%03d", random.nextInt(1000));
         
-        return "TRN-" + date + "-" + timestamp + randomPart;
+        // Format: T + yyyyMMdd + 6-digit-time + 3-digit-random = 18 characters
+        return "T" + date + timeComponent + randomPart;
     }
 
     /**

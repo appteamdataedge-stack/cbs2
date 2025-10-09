@@ -1,10 +1,11 @@
 /**
  * Transaction API service
  */
-import type { TransactionRequestDTO, TransactionResponseDTO, Page } from '../types';
+import type { TransactionRequestDTO, TransactionResponseDTO, Page, AccountBalanceDTO } from '../types';
 import { apiRequest } from './apiClient';
 
 const TRANSACTIONS_ENDPOINT = '/transactions';
+const ACCOUNTS_ENDPOINT = '/accounts';
 
 /**
  * Create a new transaction
@@ -39,5 +40,50 @@ export const getTransactionById = async (tranId: string): Promise<TransactionRes
   return apiRequest<TransactionResponseDTO>({
     method: 'GET',
     url: `${TRANSACTIONS_ENDPOINT}/${tranId}`,
+  });
+};
+
+/**
+ * Post a transaction (move from Entry to Posted status)
+ */
+export const postTransaction = async (tranId: string): Promise<TransactionResponseDTO> => {
+  return apiRequest<TransactionResponseDTO>({
+    method: 'POST',
+    url: `${TRANSACTIONS_ENDPOINT}/${tranId}/post`,
+  });
+};
+
+/**
+ * Verify a transaction (move from Posted to Verified status)
+ */
+export const verifyTransaction = async (tranId: string): Promise<TransactionResponseDTO> => {
+  return apiRequest<TransactionResponseDTO>({
+    method: 'POST',
+    url: `${TRANSACTIONS_ENDPOINT}/${tranId}/verify`,
+  });
+};
+
+/**
+ * Reverse a transaction
+ */
+export const reverseTransaction = async (tranId: string, reason?: string): Promise<TransactionResponseDTO> => {
+  const url = reason 
+    ? `${TRANSACTIONS_ENDPOINT}/${tranId}/reverse?reason=${encodeURIComponent(reason)}`
+    : `${TRANSACTIONS_ENDPOINT}/${tranId}/reverse`;
+    
+  return apiRequest<TransactionResponseDTO>({
+    method: 'POST',
+    url,
+  });
+};
+
+/**
+ * Get computed balance for an account
+ * Returns: Available Balance + Credits - Debits from today's transactions
+ */
+export const getAccountBalance = async (accountNo: string): Promise<AccountBalanceDTO> => {
+  return apiRequest<AccountBalanceDTO>({
+    method: 'GET',
+    url: `${ACCOUNTS_ENDPOINT}/${accountNo}/balance`,
   });
 };
