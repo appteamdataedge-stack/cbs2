@@ -4,11 +4,13 @@ import {
   Button,
   CircularProgress,
   FormControl,
+  FormControlLabel,
   FormHelperText,
   Grid,
   InputLabel,
   MenuItem,
   Select,
+  Switch,
   TextField
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,16 +33,21 @@ const ProductForm = () => {
     control, 
     handleSubmit, 
     setValue,
+    watch,
     formState: { errors }
   } = useForm<ProductRequestDTO>({
     defaultValues: {
       productCode: '',
       productName: '',
-      productType: '',
       cumGLNum: '', // GL Number field
+      customerProduct: false,
+      interestBearing: false,
       makerId: 'FRONTEND_USER', // Default maker ID
     }
   });
+
+  // Watch customerProduct to conditionally show interestBearing
+  const isCustomerProduct = watch('customerProduct');
 
   // Get product data if editing
   const { data: productData, isLoading: isLoadingProduct } = useQuery({
@@ -61,11 +68,19 @@ const ProductForm = () => {
       // Set form values from loaded product data
       setValue('productCode', productData.productCode);
       setValue('productName', productData.productName);
-      // setValue('productType', productData.productType); // Removed as productType doesn't exist in backend
       setValue('cumGLNum', productData.cumGLNum);
+      setValue('customerProduct', productData.customerProduct || false);
+      setValue('interestBearing', productData.interestBearing || false);
       setValue('makerId', 'FRONTEND_USER'); // Use default for edits too
     }
   }, [productData, isEdit, setValue]);
+
+  // Reset interestBearing when customerProduct is turned off
+  useEffect(() => {
+    if (!isCustomerProduct) {
+      setValue('interestBearing', false);
+    }
+  }, [isCustomerProduct, setValue]);
 
   // Mutations for create and update
   const createMutation = useMutation({
@@ -143,22 +158,43 @@ const ProductForm = () => {
               </Grid>
               
               <Grid item xs={12} md={6}>
-                <Controller
-                  name="productType"
-                  control={control}
-                  rules={{ required: 'Product Type is mandatory' }}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Product Type"
-                      fullWidth
-                      required
-                      error={!!errors.productType}
-                      helperText={errors.productType?.message}
-                      disabled={isLoading || (isEdit && productData?.verified)}
+                <Box display="flex" alignItems="center" gap={2}>
+                  <Controller
+                    name="customerProduct"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            {...field}
+                            checked={field.value || false}
+                            disabled={isLoading || (isEdit && productData?.verified)}
+                          />
+                        }
+                        label="Customer Product"
+                      />
+                    )}
+                  />
+                  
+                  {isCustomerProduct && (
+                    <Controller
+                      name="interestBearing"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              {...field}
+                              checked={field.value || false}
+                              disabled={isLoading || (isEdit && productData?.verified)}
+                            />
+                          }
+                          label="Interest Bearing"
+                        />
+                      )}
                     />
                   )}
-                />
+                </Box>
               </Grid>
 
               <Grid item xs={12} md={6}>

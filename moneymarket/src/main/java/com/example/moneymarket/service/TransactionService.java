@@ -73,6 +73,13 @@ public class TransactionService {
             CustAcctMaster account = custAcctMasterRepository.findById(lineDTO.getAccountNo())
                     .orElseThrow(() -> new ResourceNotFoundException("Account", "Account Number", lineDTO.getAccountNo()));
             
+            // Validate sub-product is active
+            if (account.getSubProduct().getSubProductStatus() != com.example.moneymarket.entity.SubProdMaster.SubProductStatus.Active) {
+                throw new BusinessException("Cannot process transaction on " + 
+                    account.getSubProduct().getSubProductStatus().toString().toLowerCase() + 
+                    " sub-product: " + account.getSubProduct().getSubProductName());
+            }
+            
             // Create transaction record
             String lineId = tranId + "-" + lineNumber++;
             TranTable transaction = TranTable.builder()

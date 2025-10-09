@@ -19,6 +19,8 @@ public class ProductResponseDTO {
     private String productCode;
     private String productName;
     private String cumGLNum;
+    private Boolean customerProduct;
+    private Boolean interestBearing;
     private String makerId;
     private LocalDate entryDate;
     private LocalTime entryTime;

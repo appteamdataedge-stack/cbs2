@@ -94,6 +94,8 @@ public class ProductService {
         product.setProductCode(productRequestDTO.getProductCode());
         product.setProductName(productRequestDTO.getProductName());
         product.setCumGLNum(productRequestDTO.getCumGLNum());
+        product.setCustomerProduct(productRequestDTO.getCustomerProduct());
+        product.setInterestBearing(productRequestDTO.getInterestBearing());
         product.setMakerId(productRequestDTO.getMakerId());
         
         // After update, reset verification fields
@@ -180,6 +182,8 @@ public class ProductService {
                 .productCode(dto.getProductCode())
                 .productName(dto.getProductName())
                 .cumGLNum(dto.getCumGLNum())
+                .customerProduct(dto.getCustomerProduct())
+                .interestBearing(dto.getInterestBearing())
                 .makerId(dto.getMakerId())
                 .entryDate(LocalDate.now())
                 .entryTime(LocalTime.now())
@@ -221,6 +225,8 @@ public class ProductService {
                 .productCode(entity.getProductCode())
                 .productName(entity.getProductName())
                 .cumGLNum(entity.getCumGLNum())
+                .customerProduct(entity.getCustomerProduct())
+                .interestBearing(entity.getInterestBearing())
                 .makerId(entity.getMakerId())
                 .entryDate(entity.getEntryDate())
                 .entryTime(entity.getEntryTime())

@@ -208,21 +208,12 @@ public class InterestAccrualService {
      * @return The interest rate as a decimal (e.g., 0.05 for 5%)
      */
     private BigDecimal getInterestRate(SubProdMaster subProduct) {
-        // In a real system, this would be a lookup to a rate table
-        // For this prototype, use a simplified approach
-        String inttCode = subProduct.getInttCode();
-        
-        if (inttCode == null || inttCode.isEmpty()) {
-            return BigDecimal.ZERO;
+        // Prefer effective interest rate if precomputed
+        if (subProduct.getEffectiveInterestRate() != null) {
+            return subProduct.getEffectiveInterestRate();
         }
-        
-        // Mock interest rates by intt_code - in a real system this would be from a table
-        Map<String, BigDecimal> rates = new HashMap<>();
-        rates.put("ONL-INT", new BigDecimal("0.03")); // 3% for overnight loans
-        rates.put("TML-INT", new BigDecimal("0.05")); // 5% for term loans
-        rates.put("OND-INT", new BigDecimal("0.02")); // 2% for overnight deposits
-        
-        return rates.getOrDefault(inttCode, new BigDecimal("0.04")); // Default 4%
+        // Fallback to zero if none configured
+        return BigDecimal.ZERO;
     }
     
     /**

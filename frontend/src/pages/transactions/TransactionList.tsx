@@ -62,7 +62,7 @@ const TransactionList = () => {
           lineId: 1,
           accountNo: 'ACC10001',
           accountName: 'John Doe Savings',
-          drCrFlag: DrCrFlag.DEBIT,
+          drCrFlag: DrCrFlag.D,
           tranCcy: 'BDT',
           fcyAmt: 50000.00,
           exchangeRate: 1.0,
@@ -73,7 +73,7 @@ const TransactionList = () => {
           lineId: 2,
           accountNo: 'ACC10002',
           accountName: 'John Doe Investment',
-          drCrFlag: DrCrFlag.CREDIT,
+          drCrFlag: DrCrFlag.C,
           tranCcy: 'BDT',
           fcyAmt: 50000.00,
           exchangeRate: 1.0,
@@ -95,7 +95,7 @@ const TransactionList = () => {
           lineId: 1,
           accountNo: 'ACC10003',
           accountName: 'Sarah Smith Savings',
-          drCrFlag: DrCrFlag.CREDIT,
+          drCrFlag: DrCrFlag.C,
           tranCcy: 'BDT',
           fcyAmt: 25000.00,
           exchangeRate: 1.0,
@@ -106,7 +106,7 @@ const TransactionList = () => {
           lineId: 2,
           accountNo: 'CASH001',
           accountName: 'Cash Account',
-          drCrFlag: DrCrFlag.DEBIT,
+          drCrFlag: DrCrFlag.D,
           tranCcy: 'BDT',
           fcyAmt: 25000.00,
           exchangeRate: 1.0,
@@ -128,7 +128,7 @@ const TransactionList = () => {
           lineId: 1,
           accountNo: 'ACC10004',
           accountName: 'Ahmed Hassan Current',
-          drCrFlag: DrCrFlag.CREDIT,
+          drCrFlag: DrCrFlag.C,
           tranCcy: 'BDT',
           fcyAmt: 100000.00,
           exchangeRate: 1.0,
@@ -139,7 +139,7 @@ const TransactionList = () => {
           lineId: 2,
           accountNo: 'LOAN001',
           accountName: 'Personal Loan Portfolio',
-          drCrFlag: DrCrFlag.DEBIT,
+          drCrFlag: DrCrFlag.D,
           tranCcy: 'BDT',
           fcyAmt: 100000.00,
           exchangeRate: 1.0,
@@ -161,7 +161,7 @@ const TransactionList = () => {
           lineId: 1,
           accountNo: 'ACC10005',
           accountName: 'Fatima Khatun Salary',
-          drCrFlag: DrCrFlag.CREDIT,
+          drCrFlag: DrCrFlag.C,
           tranCcy: 'BDT',
           fcyAmt: 75000.00,
           exchangeRate: 1.0,
@@ -172,7 +172,7 @@ const TransactionList = () => {
           lineId: 2,
           accountNo: 'PAY001',
           accountName: 'Payroll Account',
-          drCrFlag: DrCrFlag.DEBIT,
+          drCrFlag: DrCrFlag.D,
           tranCcy: 'BDT',
           fcyAmt: 75000.00,
           exchangeRate: 1.0,
@@ -194,7 +194,7 @@ const TransactionList = () => {
           lineId: 1,
           accountNo: 'ACC10006',
           accountName: 'Rahman Electric Bill',
-          drCrFlag: DrCrFlag.DEBIT,
+          drCrFlag: DrCrFlag.D,
           tranCcy: 'BDT',
           fcyAmt: 15000.00,
           exchangeRate: 1.0,
@@ -205,7 +205,7 @@ const TransactionList = () => {
           lineId: 2,
           accountNo: 'UTIL001',
           accountName: 'Utility Collection Account',
-          drCrFlag: DrCrFlag.CREDIT,
+          drCrFlag: DrCrFlag.C,
           tranCcy: 'BDT',
           fcyAmt: 15000.00,
           exchangeRate: 1.0,
@@ -462,7 +462,7 @@ const TransactionList = () => {
                       <TableCell align="right">FCY Amount</TableCell>
                       <TableCell align="right">Exchange Rate</TableCell>
                       <TableCell align="right">LCY Amount</TableCell>
-                      <TableCell>Reference</TableCell>
+                      <TableCell>Narration</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -471,8 +471,8 @@ const TransactionList = () => {
                         <TableCell>{line.accountNo} {line.accountName && `(${line.accountName})`}</TableCell>
                         <TableCell>
                           <Chip 
-                            label={line.drCrFlag} 
-                            color={line.drCrFlag === DrCrFlag.DEBIT ? 'primary' : 'secondary'} 
+                            label={line.drCrFlag === DrCrFlag.D ? 'Debit' : 'Credit'} 
+                            color={line.drCrFlag === DrCrFlag.D ? 'primary' : 'secondary'} 
                             size="small"
                           />
                         </TableCell>

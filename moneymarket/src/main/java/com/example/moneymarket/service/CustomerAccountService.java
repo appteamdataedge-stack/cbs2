@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -56,6 +57,9 @@ public class CustomerAccountService {
             throw new BusinessException("Sub-Product is not active");
         }
 
+        // Apply Tenor and Date of Maturity logic
+        applyTenorAndMaturityLogic(accountRequestDTO, subProduct);
+
         // Generate customer account number using the new format
         String accountNo = accountNumberService.generateCustomerAccountNumber(customer, subProduct);
         String glNum = subProduct.getCumGLNum();
@@ -66,7 +70,7 @@ public class CustomerAccountService {
         // Save the account
         CustAcctMaster savedAccount = custAcctMasterRepository.save(account);
         
-        // Initialize account balance
+        // Initialize account balance (Acct_Bal & opening row for daily master if required)
         AcctBal accountBalance = AcctBal.builder()
                 .account(savedAccount)
                 .currentBalance(BigDecimal.ZERO)
@@ -102,9 +106,12 @@ public class CustomerAccountService {
         CustMaster customer = custMasterRepository.findById(accountRequestDTO.getCustId())
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "ID", accountRequestDTO.getCustId()));
 
-        // Validate sub-product exists
-        SubProdMaster subProduct = subProdMasterRepository.findById(accountRequestDTO.getSubProductId())
+        // Validate sub-product exists (with Product relationship loaded)
+        SubProdMaster subProduct = subProdMasterRepository.findByIdWithProduct(accountRequestDTO.getSubProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Sub-Product", "ID", accountRequestDTO.getSubProductId()));
+
+        // Apply Tenor and Date of Maturity logic
+        applyTenorAndMaturityLogic(accountRequestDTO, subProduct);
 
         // Check if changing to closed status and validate balance is zero
         if (accountRequestDTO.getAccountStatus() == CustAcctMaster.AccountStatus.Closed) {
@@ -268,5 +275,59 @@ public class CustomerAccountService {
                 .currentBalance(balance.getCurrentBalance())
                 .availableBalance(balance.getAvailableBalance())
                 .build();
+    }
+
+    /**
+     * Apply Tenor and Date of Maturity logic based on account type
+     * As per BRD: Tenor and Date of Maturity fields are disabled for all running accounts (SB and CA).
+     * As per BRD: Date of Maturity = Date of Opening + Tenor.
+     * Alternatively, Tenor = Date of Maturity - Date of Opening.
+     * 
+     * @param dto The account request DTO
+     * @param subProduct The sub-product entity
+     */
+    private void applyTenorAndMaturityLogic(CustomerAccountRequestDTO dto, SubProdMaster subProduct) {
+        String glNum = subProduct.getCumGLNum();
+        
+        // Check if this is a running account (SB or CA)
+        boolean isRunningAccount = glNum.startsWith("110101") || glNum.startsWith("110102");
+        
+        // As per BRD: Tenor and Date of Maturity fields are disabled for all running accounts (SB and CA).
+        if (isRunningAccount) {
+            dto.setTenor(null);
+            dto.setDateMaturity(null);
+            log.info("Running account detected (GL: {}), nullifying Tenor and Date of Maturity", glNum);
+            return;
+        }
+        
+        // Check if this is a deal-based account (TD, RD, OD/CC, TL)
+        boolean isDealBasedAccount = glNum.startsWith("110201") || // Term Deposit
+                                     glNum.startsWith("110202") || // Recurring Deposit
+                                     glNum.startsWith("210201") || // Overdraft/CC
+                                     glNum.startsWith("210202");   // Term Loan
+        
+        if (isDealBasedAccount) {
+            // Auto-calculate based on provided input
+            if (dto.getTenor() != null && dto.getDateMaturity() == null) {
+                // Calculate Date of Maturity from Tenor
+                LocalDate maturityDate = dto.getDateOpening().plusDays(dto.getTenor());
+                dto.setDateMaturity(maturityDate);
+                log.info("Auto-calculated Date of Maturity: {} (Opening: {}, Tenor: {})", 
+                        maturityDate, dto.getDateOpening(), dto.getTenor());
+            } else if (dto.getDateMaturity() != null && dto.getTenor() == null) {
+                // Calculate Tenor from Date of Maturity
+                long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(
+                        dto.getDateOpening(), dto.getDateMaturity());
+                dto.setTenor((int) daysBetween);
+                log.info("Auto-calculated Tenor: {} days (Opening: {}, Maturity: {})", 
+                        daysBetween, dto.getDateOpening(), dto.getDateMaturity());
+            } else if (dto.getTenor() != null && dto.getDateMaturity() != null) {
+                // Validate both fields match
+                LocalDate calculatedMaturity = dto.getDateOpening().plusDays(dto.getTenor());
+                if (!calculatedMaturity.equals(dto.getDateMaturity())) {
+                    throw new BusinessException("Tenor and Date of Maturity do not match. Please correct the input.");
+                }
+            }
+        }
     }
 }

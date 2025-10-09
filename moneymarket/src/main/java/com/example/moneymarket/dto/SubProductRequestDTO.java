@@ -36,6 +36,11 @@ public class SubProductRequestDTO {
     @Size(max = 10, message = "External GL Number cannot exceed 10 characters")
     private String extGLNum;
 
+    // Interest related (required when product is customer+interest bearing)
+    private java.math.BigDecimal interestIncrement;
+    private String interestPayableGLNum;
+    private String interestIncomeGLNum;
+
     @NotNull(message = "Sub-Product Status is mandatory")
     private SubProductStatus subProductStatus;
 

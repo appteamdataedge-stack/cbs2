@@ -24,6 +24,10 @@ public class SubProductResponseDTO {
     private String inttCode;
     private String cumGLNum;
     private String extGLNum;
+    private java.math.BigDecimal interestIncrement;
+    private String interestPayableGLNum;
+    private String interestIncomeGLNum;
+    private java.math.BigDecimal effectiveInterestRate;
     private SubProductStatus subProductStatus;
     private String makerId;
     private LocalDate entryDate;

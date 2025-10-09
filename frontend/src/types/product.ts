@@ -15,8 +15,9 @@ export interface GLSetupResponseDTO {
 export interface ProductRequestDTO {
   productCode: string;
   productName: string;
-  productType: string;
   cumGLNum: string; // GL Number field
+  customerProduct?: boolean;
+  interestBearing?: boolean;
   makerId: string;
 }
 
@@ -26,6 +27,8 @@ export interface ProductResponseDTO {
   productCode: string;
   productName: string;
   cumGLNum: string; // GL Number field
+  customerProduct?: boolean;
+  interestBearing?: boolean;
   makerId: string;
   entryDate: string; // LocalDate as ISO string
   entryTime: string; // LocalTime as ISO string

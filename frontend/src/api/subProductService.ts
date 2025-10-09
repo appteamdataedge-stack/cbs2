@@ -43,6 +43,11 @@ export const getSubProductById = async (id: number): Promise<SubProductResponseD
  * Create a new sub-product
  */
 export const createSubProduct = async (subProduct: SubProductRequestDTO): Promise<SubProductResponseDTO> => {
+  console.log('=== CREATE SUB-PRODUCT API CALL ===');
+  console.log('Data being sent:', JSON.stringify(subProduct, null, 2));
+  console.log('Interest Increment type:', typeof subProduct.interestIncrement);
+  console.log('Interest Increment value:', subProduct.interestIncrement);
+  
   return apiRequest<SubProductResponseDTO>({
     method: 'POST',
     url: SUBPRODUCTS_ENDPOINT,

@@ -26,6 +26,8 @@ CREATE TABLE Prod_Master (
   Product_Code VARCHAR(10) NOT NULL UNIQUE,
   Product_Name VARCHAR(50) NOT NULL,
   Cum_GL_Num VARCHAR(20) NOT NULL,
+  Customer_Product TINYINT(1) DEFAULT 1,
+  Interest_Bearing TINYINT(1) DEFAULT 0,
   Maker_Id VARCHAR(20) NOT NULL,
   Entry_Date DATE NOT NULL,
   Entry_Time TIME NOT NULL,
@@ -42,6 +44,10 @@ CREATE TABLE Sub_Prod_Master (
   Intt_Code VARCHAR(10),
   Cum_GL_Num VARCHAR(10) NOT NULL,
   Ext_GL_Num VARCHAR(10),
+  Interest_Increment DECIMAL(10,4),
+  Effective_Interest_Rate DECIMAL(10,4),
+  Interest_Payable_GL_Num VARCHAR(20),
+  Interest_Income_GL_Num VARCHAR(20),
   Sub_Product_Status ENUM('Active', 'Inactive', 'Deactive') NOT NULL,
   Maker_Id VARCHAR(20) NOT NULL,
   Entry_Date DATE NOT NULL,
@@ -49,7 +55,8 @@ CREATE TABLE Sub_Prod_Master (
   Verifier_Id VARCHAR(20),
   Verification_Date DATE,
   Verification_Time TIME,
-  FOREIGN KEY (Product_Id) REFERENCES Prod_Master(Product_Id) ON DELETE CASCADE
+  FOREIGN KEY (Product_Id) REFERENCES Prod_Master(Product_Id) ON DELETE CASCADE,
+  FOREIGN KEY (Intt_Code) REFERENCES Interest_Rate_Master(Intt_Code)
 );
 
 CREATE TABLE Cust_Acct_Master (
@@ -66,7 +73,8 @@ CREATE TABLE Cust_Acct_Master (
   Branch_Code VARCHAR(10) NOT NULL,
   Account_Status ENUM('Active', 'Inactive', 'Closed', 'Dormant') NOT NULL,
   FOREIGN KEY (Sub_Product_Id) REFERENCES Sub_Prod_Master(Sub_Product_Id),
-  FOREIGN KEY (Cust_Id) REFERENCES Cust_Master(Cust_Id)
+  FOREIGN KEY (Cust_Id) REFERENCES Cust_Master(Cust_Id),
+  FOREIGN KEY (GL_Num) REFERENCES GL_setup(GL_Num)
 );
 
 CREATE TABLE OF_Acct_Master (
@@ -79,7 +87,8 @@ CREATE TABLE OF_Acct_Master (
   Branch_Code VARCHAR(10) NOT NULL,
   Account_Status ENUM('Active', 'Inactive', 'Closed') NOT NULL,
   Reconciliation_Required BOOLEAN NOT NULL,
-  FOREIGN KEY (Sub_Product_Id) REFERENCES Sub_Prod_Master(Sub_Product_Id)
+  FOREIGN KEY (Sub_Product_Id) REFERENCES Sub_Prod_Master(Sub_Product_Id),
+  FOREIGN KEY (GL_Num) REFERENCES GL_setup(GL_Num)
 );
 
 CREATE TABLE Tran_Table (

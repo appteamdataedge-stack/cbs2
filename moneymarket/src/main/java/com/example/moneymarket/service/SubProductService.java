@@ -10,6 +10,7 @@ import com.example.moneymarket.exception.BusinessException;
 import com.example.moneymarket.exception.ResourceNotFoundException;
 import com.example.moneymarket.repository.GLBalanceRepository;
 import com.example.moneymarket.repository.ProdMasterRepository;
+import com.example.moneymarket.repository.InterestRateMasterRepository;
 import com.example.moneymarket.repository.SubProdMasterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class SubProductService {
     private final GLBalanceRepository glBalanceRepository;
     private final GLNumberService glNumberService;
     private final GLValidationService glValidationService;
+    private final InterestRateMasterRepository interestRateMasterRepository;
 
     /**
      * Create a new sub-product
@@ -47,6 +49,11 @@ public class SubProductService {
      */
     @Transactional
     public SubProductResponseDTO createSubProduct(SubProductRequestDTO subProductRequestDTO) {
+        log.info("=== CREATE SUB-PRODUCT SERVICE CALL ===");
+        log.info("Received DTO: {}", subProductRequestDTO);
+        log.info("Interest Code: {}", subProductRequestDTO.getInttCode());
+        log.info("Interest Increment: {}", subProductRequestDTO.getInterestIncrement());
+        
         // Check if sub-product code is unique
         if (subProdMasterRepository.existsBySubProductCode(subProductRequestDTO.getSubProductCode())) {
             throw new BusinessException("Sub-Product Code already exists");
@@ -55,6 +62,9 @@ public class SubProductService {
         // Validate product exists
         ProdMaster product = prodMasterRepository.findById(subProductRequestDTO.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "ID", subProductRequestDTO.getProductId()));
+        
+        log.info("Product found: ID={}, customerProduct={}, interestBearing={}", 
+                product.getProductId(), product.getCustomerProduct(), product.getInterestBearing());
 
         // Validate GL Number exists and is at layer 4
         try {
@@ -80,6 +90,9 @@ public class SubProductService {
 
         // Map DTO to entity
         SubProdMaster subProduct = mapToEntity(subProductRequestDTO, product);
+
+        // Compute effective interest rate if applicable
+        applyEffectiveInterestRate(product, subProduct);
 
         // Set audit fields
         subProduct.setEntryDate(LocalDate.now());
@@ -154,6 +167,9 @@ public class SubProductService {
         subProduct.setInttCode(subProductRequestDTO.getInttCode());
         subProduct.setCumGLNum(subProductRequestDTO.getCumGLNum());
         subProduct.setExtGLNum(subProductRequestDTO.getExtGLNum());
+        subProduct.setInterestIncrement(subProductRequestDTO.getInterestIncrement());
+        subProduct.setInterestPayableGLNum(subProductRequestDTO.getInterestPayableGLNum());
+        subProduct.setInterestIncomeGLNum(subProductRequestDTO.getInterestIncomeGLNum());
         subProduct.setSubProductStatus(subProductRequestDTO.getSubProductStatus());
         subProduct.setMakerId(subProductRequestDTO.getMakerId());
         
@@ -162,12 +178,40 @@ public class SubProductService {
         subProduct.setVerificationDate(null);
         subProduct.setVerificationTime(null);
 
+        // Recompute effective interest rate if applicable
+        applyEffectiveInterestRate(product, subProduct);
+
         // Save the updated sub-product
         SubProdMaster updatedSubProduct = subProdMasterRepository.save(subProduct);
         log.info("Sub-Product updated with ID: {}", updatedSubProduct.getSubProductId());
 
         // Return the response
         return mapToResponse(updatedSubProduct);
+    }
+
+    private void applyEffectiveInterestRate(ProdMaster product, SubProdMaster subProduct) {
+        log.info("=== APPLY EFFECTIVE INTEREST RATE ===");
+        log.info("Product - customerProduct: {}, interestBearing: {}", 
+                product.getCustomerProduct(), product.getInterestBearing());
+        log.info("SubProduct - inttCode: {}, interestIncrement: {}", 
+                subProduct.getInttCode(), subProduct.getInterestIncrement());
+        
+        if (Boolean.TRUE.equals(product.getCustomerProduct()) && Boolean.TRUE.equals(product.getInterestBearing())) {
+            log.info("Product is customer+interest bearing, validating interest fields...");
+            if (subProduct.getInttCode() == null || subProduct.getInterestIncrement() == null) {
+                log.error("VALIDATION FAILED - inttCode: {}, interestIncrement: {}", 
+                        subProduct.getInttCode(), subProduct.getInterestIncrement());
+                throw new BusinessException("Interest Code and Interest Increment are required when product is interest-bearing");
+            }
+            java.math.BigDecimal baseRate = interestRateMasterRepository
+                .findTopByInttCodeAndInttEffctvDateLessThanEqualOrderByInttEffctvDateDesc(subProduct.getInttCode(), java.time.LocalDate.now())
+                .map(r -> r.getInttRate())
+                .orElseThrow(() -> new BusinessException("No interest rate found for code: " + subProduct.getInttCode()));
+            java.math.BigDecimal effective = baseRate.add(subProduct.getInterestIncrement());
+            subProduct.setEffectiveInterestRate(effective);
+        } else {
+            subProduct.setEffectiveInterestRate(null);
+        }
     }
 
     /**
@@ -245,6 +289,9 @@ public class SubProductService {
                 .inttCode(dto.getInttCode())
                 .cumGLNum(dto.getCumGLNum())
                 .extGLNum(dto.getExtGLNum())
+                .interestIncrement(dto.getInterestIncrement())
+                .interestPayableGLNum(dto.getInterestPayableGLNum())
+                .interestIncomeGLNum(dto.getInterestIncomeGLNum())
                 .subProductStatus(dto.getSubProductStatus())
                 .makerId(dto.getMakerId())
                 .entryDate(LocalDate.now())
@@ -269,6 +316,10 @@ public class SubProductService {
                 .inttCode(entity.getInttCode())
                 .cumGLNum(entity.getCumGLNum())
                 .extGLNum(entity.getExtGLNum())
+                .interestIncrement(entity.getInterestIncrement())
+                .interestPayableGLNum(entity.getInterestPayableGLNum())
+                .interestIncomeGLNum(entity.getInterestIncomeGLNum())
+                .effectiveInterestRate(entity.getEffectiveInterestRate())
                 .subProductStatus(entity.getSubProductStatus())
                 .makerId(entity.getMakerId())
                 .entryDate(entity.getEntryDate())

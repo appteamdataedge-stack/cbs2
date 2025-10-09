@@ -11,12 +11,15 @@ export enum SubProductStatus {
 
 // SubProduct request DTO
 export interface SubProductRequestDTO {
+  productId: number;
   subProductCode: string;
   subProductName: string;
-  productId: number;
   inttCode?: string;
   cumGLNum: string;
   extGLNum?: string;
+  interestIncrement?: number;
+  interestPayableGLNum?: string;
+  interestIncomeGLNum?: string;
   subProductStatus: SubProductStatus;
   makerId: string;
 }
@@ -32,6 +35,10 @@ export interface SubProductResponseDTO {
   inttCode?: string;
   cumGLNum: string;
   extGLNum?: string;
+  interestIncrement?: number;
+  interestPayableGLNum?: string;
+  interestIncomeGLNum?: string;
+  effectiveInterestRate?: number;
   subProductStatus: SubProductStatus;
   makerId: string;
   entryDate: string; // LocalDate as ISO string

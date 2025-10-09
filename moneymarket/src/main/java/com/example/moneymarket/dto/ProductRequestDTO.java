@@ -25,6 +25,10 @@ public class ProductRequestDTO {
     @Size(max = 20, message = "GL Number cannot exceed 20 characters")
     private String cumGLNum;
 
+    // Flags per BRD
+    private Boolean customerProduct;
+    private Boolean interestBearing;
+
     @NotBlank(message = "Maker ID is mandatory")
     @Size(max = 20, message = "Maker ID cannot exceed 20 characters")
     private String makerId;

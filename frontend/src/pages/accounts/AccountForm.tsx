@@ -83,10 +83,28 @@ const AccountForm = () => {
   // Get selected values
   const selectedCustId = watch('custId');
   const selectedSubProductId = watch('subProductId');
+  const dateOpening = watch('dateOpening');
+  const tenor = watch('tenor');
+  const dateMaturity = watch('dateMaturity');
 
   // Find selected customer and subproduct
   const selectedCustomer = customersData?.content.find(c => c.custId === selectedCustId);
   const selectedSubProduct = subProductsData?.content.find(s => s.subProductId === selectedSubProductId);
+
+  // Identify account type based on GL_Num
+  // As per BRD: Tenor and Date of Maturity fields are disabled for all running accounts (SB and CA).
+  const isRunningAccount = selectedSubProduct?.cumGLNum ? (
+    selectedSubProduct.cumGLNum.startsWith('110101') || // Savings Bank (SB)
+    selectedSubProduct.cumGLNum.startsWith('110102')    // Current Account (CA)
+  ) : false;
+  
+  // Identify deal-based accounts (TD, RD, OD/CC, TL)
+  const isDealBasedAccount = selectedSubProduct?.cumGLNum ? (
+    selectedSubProduct.cumGLNum.startsWith('110201') || // Term Deposit (TD)
+    selectedSubProduct.cumGLNum.startsWith('110202') || // Recurring Deposit (RD)
+    selectedSubProduct.cumGLNum.startsWith('210201') || // Overdraft/CC (OD/CC)
+    selectedSubProduct.cumGLNum.startsWith('210202')    // Term Loan (TL)
+  ) : false;
 
   // Create account mutation
   const createAccountMutation = useMutation({
@@ -126,10 +144,35 @@ const AccountForm = () => {
 
   // Submit handler
   const onSubmit = (data: CustomerAccountRequestDTO) => {
+    // Validate Tenor and Date of Maturity match for deal-based accounts
+    if (isDealBasedAccount && data.tenor && data.dateMaturity && data.dateOpening) {
+      const openingDate = new Date(data.dateOpening);
+      const maturityDate = new Date(data.dateMaturity);
+      const calculatedMaturity = new Date(openingDate);
+      calculatedMaturity.setDate(calculatedMaturity.getDate() + Number(data.tenor));
+      
+      // Check if dates match (allowing 1 day tolerance for date calculation differences)
+      const timeDiff = Math.abs(maturityDate.getTime() - calculatedMaturity.getTime());
+      const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+      
+      if (daysDiff > 1) {
+        toast.warning("Tenor and Date of Maturity do not match. Please correct the input.");
+        return;
+      }
+    }
+    
+    // Nullify tenor and dateMaturity for running accounts
+    // As per BRD: Tenor and Date of Maturity fields are disabled for all running accounts (SB and CA).
+    const sanitizedData = {
+      ...data,
+      tenor: isRunningAccount ? undefined : data.tenor,
+      dateMaturity: isRunningAccount ? undefined : data.dateMaturity,
+    };
+    
     if (isEdit) {
-      updateAccountMutation.mutate(data);
+      updateAccountMutation.mutate(sanitizedData);
     } else {
-      createAccountMutation.mutate(data);
+      createAccountMutation.mutate(sanitizedData);
     }
   };
 
@@ -154,6 +197,13 @@ const AccountForm = () => {
     }
   };
 
+  // Use generateAccountName when needed
+  useEffect(() => {
+    if (selectedCustomer && selectedSubProduct) {
+      generateAccountName();
+    }
+  }, [selectedCustomer, selectedSubProduct]);
+
   // Populate form when editing
   useEffect(() => {
     if (accountData && isEdit) {
@@ -168,6 +218,41 @@ const AccountForm = () => {
       setValue('accountStatus', accountData.accountStatus);
     }
   }, [accountData, isEdit, setValue]);
+
+  // Reset tenor and dateMaturity for running accounts
+  // As per BRD: Tenor and Date of Maturity fields are disabled for all running accounts (SB and CA).
+  useEffect(() => {
+    if (isRunningAccount) {
+      setValue('tenor', undefined);
+      setValue('dateMaturity', undefined);
+    }
+  }, [isRunningAccount, setValue]);
+
+  // Auto-calculate Date of Maturity when Tenor changes
+  // As per BRD: Date of Maturity = Date of Opening + Tenor.
+  useEffect(() => {
+    if (isDealBasedAccount && tenor && dateOpening && !isEdit) {
+      const openingDate = new Date(dateOpening);
+      const maturityDate = new Date(openingDate);
+      maturityDate.setDate(maturityDate.getDate() + Number(tenor));
+      setValue('dateMaturity', maturityDate.toISOString().split('T')[0]);
+    }
+  }, [tenor, dateOpening, isDealBasedAccount, isEdit, setValue]);
+
+  // Auto-calculate Tenor when Date of Maturity changes
+  // Alternatively, Tenor = Date of Maturity - Date of Opening.
+  useEffect(() => {
+    if (isDealBasedAccount && dateMaturity && dateOpening && !isEdit) {
+      const openingDate = new Date(dateOpening);
+      const maturityDate = new Date(dateMaturity);
+      const diffTime = maturityDate.getTime() - openingDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays >= 0) {
+        setValue('tenor', diffDays);
+      }
+    }
+  }, [dateMaturity, dateOpening, isDealBasedAccount, isEdit, setValue]);
 
   // Handle dialog close
   const handleCloseSuccessDialog = () => {
@@ -416,8 +501,15 @@ const AccountForm = () => {
                     type="number"
                     fullWidth
                     error={!!errors.tenor}
-                    helperText={errors.tenor?.message || 'Optional: Number of days for term deposits'}
-                    disabled={isLoading}
+                    helperText={
+                      isRunningAccount 
+                        ? 'Not applicable for running accounts (SB/CA)' 
+                        : (errors.tenor?.message || (isDealBasedAccount ? 'Auto-calculated based on Date of Maturity' : 'Optional: Number of days'))
+                    }
+                    disabled={isLoading || isRunningAccount}
+                    InputProps={{
+                      readOnly: isRunningAccount
+                    }}
                   />
                 )}
               />
@@ -434,10 +526,17 @@ const AccountForm = () => {
                     type="date"
                     fullWidth
                     error={!!errors.dateMaturity}
-                    helperText={errors.dateMaturity?.message || 'Optional: For term deposits'}
-                    disabled={isLoading}
+                    helperText={
+                      isRunningAccount 
+                        ? 'Not applicable for running accounts (SB/CA)' 
+                        : (errors.dateMaturity?.message || (isDealBasedAccount ? 'Auto-calculated based on Tenor' : 'Optional: For term deposits'))
+                    }
+                    disabled={isLoading || isRunningAccount}
                     InputLabelProps={{
                       shrink: true,
+                    }}
+                    InputProps={{
+                      readOnly: isRunningAccount
                     }}
                   />
                 )}

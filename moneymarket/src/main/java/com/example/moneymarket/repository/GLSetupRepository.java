@@ -22,4 +22,6 @@ public interface GLSetupRepository extends JpaRepository<GLSetup, String> {
     
     @Query("SELECT g FROM GLSetup g WHERE g.parentGLNum = ?1 ORDER BY g.layerGLNum")
     List<GLSetup> findChildGLsByParentGLNumOrderByLayerGLNum(String parentGLNum);
+    
+    List<GLSetup> findByGlName(String glName);
 }

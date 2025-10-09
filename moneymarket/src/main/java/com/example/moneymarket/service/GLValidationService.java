@@ -98,6 +98,9 @@ public class GLValidationService {
             throw new BusinessException("Sub-product GL " + subProductGlNum + 
                     " must have parent GL " + productGlNum + " but has " + glSetup.getParentGLNum());
         }
+        
+        // Validate GL uniqueness constraints
+        validateGLUniqueness(glSetup);
     }
     
     /**
@@ -154,5 +157,26 @@ public class GLValidationService {
             return false;
         }
         return glNum.charAt(1) != '1';
+    }
+    
+    /**
+     * Validate GL uniqueness constraints
+     * - One GL_Name cannot have two Parent_GL_Num
+     * - GL_Num must be unique
+     * 
+     * @param glSetup The GL setup to validate
+     * @throws BusinessException if uniqueness constraints are violated
+     */
+    private void validateGLUniqueness(GLSetup glSetup) {
+        // Check for duplicate GL_Name with different Parent_GL_Num
+        java.util.List<GLSetup> existingGLs = glSetupRepository.findByGlName(glSetup.getGlName());
+        for (GLSetup existing : existingGLs) {
+            if (!existing.getGlNum().equals(glSetup.getGlNum()) && 
+                !existing.getParentGLNum().equals(glSetup.getParentGLNum())) {
+                throw new BusinessException("GL Name '" + glSetup.getGlName() + 
+                    "' already exists with different Parent GL Number. " +
+                    "One GL Name cannot have multiple Parent GL Numbers.");
+            }
+        }
     }
 }

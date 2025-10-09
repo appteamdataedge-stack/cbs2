@@ -2,10 +2,10 @@
  * Transaction related type definitions
  */
 
-// Debit/Credit flag enum
+// Debit/Credit flag enum (D = Debit, C = Credit)
 export enum DrCrFlag {
-  DEBIT = 'DEBIT',
-  CREDIT = 'CREDIT'
+  D = 'D',
+  C = 'C'
 }
 
 // Transaction line DTO

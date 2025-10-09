@@ -41,6 +41,19 @@ public class SubProdMaster {
     @Column(name = "Ext_GL_Num", length = 10)
     private String extGLNum;
 
+    // Interest-related fields when product is customer+interest bearing
+    @Column(name = "Interest_Increment", precision = 10, scale = 4)
+    private java.math.BigDecimal interestIncrement;
+
+    @Column(name = "Effective_Interest_Rate", precision = 10, scale = 4)
+    private java.math.BigDecimal effectiveInterestRate;
+
+    @Column(name = "Interest_Payable_GL_Num", length = 20)
+    private String interestPayableGLNum;
+
+    @Column(name = "Interest_Income_GL_Num", length = 20)
+    private String interestIncomeGLNum;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "Sub_Product_Status", nullable = false)
     private SubProductStatus subProductStatus;

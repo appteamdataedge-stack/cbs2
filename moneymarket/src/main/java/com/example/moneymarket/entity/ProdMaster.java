@@ -32,6 +32,13 @@ public class ProdMaster {
     @Column(name = "Cum_GL_Num", nullable = false, length = 20)
     private String cumGLNum;
 
+    // Flags per BRD
+    @Column(name = "customer_product")
+    private Boolean customerProduct;
+
+    @Column(name = "interest_bearing")
+    private Boolean interestBearing;
+
     @Column(name = "Maker_Id", nullable = false, length = 20)
     private String makerId;
 

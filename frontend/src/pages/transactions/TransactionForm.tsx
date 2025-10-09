@@ -28,7 +28,7 @@ import type { CustomerAccountResponseDTO, TransactionRequestDTO } from '../../ty
 import { DrCrFlag } from '../../types';
 
 // Available currencies
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY'];
+const CURRENCIES = ['BDT', 'USD', 'EUR', 'GBP', 'JPY'];
 
 const TransactionForm = () => {
   const navigate = useNavigate();
@@ -62,8 +62,8 @@ const TransactionForm = () => {
       valueDate: currentDate || new Date().toISOString().split('T')[0],
       narration: '',
       lines: [
-        { accountNo: '', drCrFlag: DrCrFlag.DEBIT, tranCcy: 'USD', fcyAmt: 0, exchangeRate: 1, lcyAmt: 0, udf1: '' },
-        { accountNo: '', drCrFlag: DrCrFlag.CREDIT, tranCcy: 'USD', fcyAmt: 0, exchangeRate: 1, lcyAmt: 0, udf1: '' }
+        { accountNo: '', drCrFlag: DrCrFlag.D, tranCcy: 'BDT', fcyAmt: 0, exchangeRate: 1, lcyAmt: 0, udf1: '' },
+        { accountNo: '', drCrFlag: DrCrFlag.C, tranCcy: 'BDT', fcyAmt: 0, exchangeRate: 1, lcyAmt: 0, udf1: '' }
       ]
     }
   });
@@ -83,9 +83,9 @@ const TransactionForm = () => {
     let creditTotal = 0;
 
     lines.forEach(line => {
-      if (line.drCrFlag === DrCrFlag.DEBIT && !isNaN(line.lcyAmt)) {
+      if (line.drCrFlag === DrCrFlag.D && !isNaN(line.lcyAmt)) {
         debitTotal += Number(line.lcyAmt);
-      } else if (line.drCrFlag === DrCrFlag.CREDIT && !isNaN(line.lcyAmt)) {
+      } else if (line.drCrFlag === DrCrFlag.C && !isNaN(line.lcyAmt)) {
         creditTotal += Number(line.lcyAmt);
       }
     });
@@ -121,8 +121,8 @@ const TransactionForm = () => {
   const addLine = () => {
     append({ 
       accountNo: '', 
-      drCrFlag: DrCrFlag.CREDIT, 
-      tranCcy: 'USD', 
+      drCrFlag: DrCrFlag.C, 
+      tranCcy: 'BDT', 
       fcyAmt: 0, 
       exchangeRate: 1, 
       lcyAmt: 0, 
@@ -130,21 +130,60 @@ const TransactionForm = () => {
     });
   };
 
-  // Calculate LCY amount when FCY or exchange rate changes
-  const calculateLcyAmount = (fcyAmt: number, exchangeRate: number, index: number) => {
-    const lcyAmt = fcyAmt * exchangeRate;
-    setValue(`lines.${index}.lcyAmt`, parseFloat(lcyAmt.toFixed(2)));
-  };
-
   // Submit handler
   const onSubmit = (data: TransactionRequestDTO) => {
-    // Ensure debit equals credit before submitting
-    if (!isBalanced) {
-      toast.error('Transaction is not balanced. Debit must equal Credit.');
+    // Validate all amounts are greater than 0
+    const invalidLines = data.lines.filter(line => !line.lcyAmt || line.lcyAmt <= 0);
+    if (invalidLines.length > 0) {
+      toast.error('All lines must have an amount greater than zero');
       return;
     }
 
-    createTransactionMutation.mutate(data);
+    // Calculate totals manually to ensure precision
+    let debitTotal = 0;
+    let creditTotal = 0;
+    
+    data.lines.forEach(line => {
+      const amount = parseFloat(String(line.lcyAmt));
+      if (line.drCrFlag === DrCrFlag.D) {
+        debitTotal += amount;
+      } else if (line.drCrFlag === DrCrFlag.C) {
+        creditTotal += amount;
+      }
+    });
+
+    // Round to 2 decimal places to avoid floating point precision issues
+    debitTotal = Math.round(debitTotal * 100) / 100;
+    creditTotal = Math.round(creditTotal * 100) / 100;
+
+    console.log('Transaction validation:', {
+      debitTotal,
+      creditTotal,
+      difference: Math.abs(debitTotal - creditTotal),
+      isBalanced: debitTotal === creditTotal
+    });
+
+    // Ensure debit equals credit before submitting
+    if (debitTotal !== creditTotal) {
+      toast.error(`Transaction is not balanced. Debit: ${debitTotal} BDT, Credit: ${creditTotal} BDT`);
+      return;
+    }
+
+    // Ensure all numeric fields are properly formatted and rounded to 2 decimals
+    const formattedData = {
+      ...data,
+      lines: data.lines.map(line => ({
+        ...line,
+        fcyAmt: Math.round((Number(line.fcyAmt) || 0) * 100) / 100,
+        exchangeRate: Number(line.exchangeRate) || 1,
+        lcyAmt: Math.round((Number(line.lcyAmt) || 0) * 100) / 100
+      }))
+    };
+
+    // Log the data being sent for debugging
+    console.log('Submitting transaction data:', JSON.stringify(formattedData, null, 2));
+
+    createTransactionMutation.mutate(formattedData);
   };
 
   return (
@@ -193,7 +232,7 @@ const TransactionForm = () => {
                     rows={1}
                     error={!!errors.narration}
                     helperText={errors.narration?.message}
-                    disabled={isLoading}
+                    disabled={true}
                   />
                 )}
               />
@@ -270,8 +309,8 @@ const TransactionForm = () => {
                           labelId={`drcr-label-${index}`}
                           label="Dr/Cr"
                         >
-                          <MenuItem value={DrCrFlag.DEBIT}>Debit</MenuItem>
-                          <MenuItem value={DrCrFlag.CREDIT}>Credit</MenuItem>
+                          <MenuItem value={DrCrFlag.D}>Debit</MenuItem>
+                          <MenuItem value={DrCrFlag.C}>Credit</MenuItem>
                         </Select>
                         <FormHelperText>{errors.lines?.[index]?.drCrFlag?.message}</FormHelperText>
                       </FormControl>
@@ -306,36 +345,23 @@ const TransactionForm = () => {
                   <Controller
                     name={`lines.${index}.fcyAmt`}
                     control={control}
-                    rules={{ 
-                      required: 'Amount is required',
-                      min: { value: 0.01, message: 'Amount must be greater than zero' }
-                    }}
                     render={({ field }) => (
                       <TextField
                         {...field}
                         label="Amount FCY"
                         type="number"
                         fullWidth
-                        required
                         InputProps={{
+                          readOnly: true,
                           startAdornment: (
                             <InputAdornment position="start">
                               {watch(`lines.${index}.tranCcy`)}
                             </InputAdornment>
                           ),
                         }}
-                        onChange={(e) => {
-                          const value = parseFloat(e.target.value);
-                          field.onChange(value);
-                          calculateLcyAmount(
-                            value, 
-                            watch(`lines.${index}.exchangeRate`), 
-                            index
-                          );
-                        }}
                         error={!!errors.lines?.[index]?.fcyAmt}
                         helperText={errors.lines?.[index]?.fcyAmt?.message}
-                        disabled={isLoading}
+                        disabled={true}
                       />
                     )}
                   />
@@ -345,29 +371,18 @@ const TransactionForm = () => {
                   <Controller
                     name={`lines.${index}.exchangeRate`}
                     control={control}
-                    rules={{ 
-                      required: 'Exchange Rate is required',
-                      min: { value: 0.0001, message: 'Rate must be greater than zero' }
-                    }}
                     render={({ field }) => (
                       <TextField
                         {...field}
                         label="Exchange Rate"
                         type="number"
                         fullWidth
-                        required
-                        onChange={(e) => {
-                          const value = parseFloat(e.target.value);
-                          field.onChange(value);
-                          calculateLcyAmount(
-                            watch(`lines.${index}.fcyAmt`), 
-                            value, 
-                            index
-                          );
+                        InputProps={{
+                          readOnly: true,
                         }}
                         error={!!errors.lines?.[index]?.exchangeRate}
                         helperText={errors.lines?.[index]?.exchangeRate?.message}
-                        disabled={isLoading}
+                        disabled={true}
                       />
                     )}
                   />
@@ -389,16 +404,30 @@ const TransactionForm = () => {
                         fullWidth
                         required
                         InputProps={{
-                          readOnly: true,
                           startAdornment: (
                             <InputAdornment position="start">
-                              USD
+                              BDT
                             </InputAdornment>
                           ),
                         }}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          // Allow empty string for clearing the field
+                          if (inputValue === '') {
+                            field.onChange(0);
+                            setValue(`lines.${index}.fcyAmt`, 0);
+                            return;
+                          }
+                          const value = parseFloat(inputValue);
+                          if (!isNaN(value)) {
+                            field.onChange(value);
+                            // For now, since exchange rate is 1 and currency is BDT, FCY equals LCY
+                            setValue(`lines.${index}.fcyAmt`, value);
+                          }
+                        }}
                         error={!!errors.lines?.[index]?.lcyAmt}
                         helperText={errors.lines?.[index]?.lcyAmt?.message}
-                        disabled={true} // Always disabled as it's calculated
+                        disabled={isLoading}
                       />
                     )}
                   />
@@ -411,7 +440,7 @@ const TransactionForm = () => {
                     render={({ field }) => (
                       <TextField
                         {...field}
-                        label="Reference"
+                        label="Narration"
                         fullWidth
                         error={!!errors.lines?.[index]?.udf1}
                         helperText={errors.lines?.[index]?.udf1?.message}
@@ -429,11 +458,11 @@ const TransactionForm = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} md={4}>
                 <Typography variant="subtitle1">Total Debit:</Typography>
-                <Typography variant="h6">{totalDebit.toLocaleString()} USD</Typography>
+                <Typography variant="h6">{totalDebit.toLocaleString()} BDT</Typography>
               </Grid>
               <Grid item xs={12} md={4}>
                 <Typography variant="subtitle1">Total Credit:</Typography>
-                <Typography variant="h6">{totalCredit.toLocaleString()} USD</Typography>
+                <Typography variant="h6">{totalCredit.toLocaleString()} BDT</Typography>
               </Grid>
               <Grid item xs={12} md={4}>
                 <Typography variant="subtitle1">Difference:</Typography>
@@ -441,7 +470,7 @@ const TransactionForm = () => {
                   variant="h6" 
                   color={isBalanced ? 'success.main' : 'error.main'}
                 >
-                  {Math.abs(totalDebit - totalCredit).toLocaleString()} USD
+                  {Math.abs(totalDebit - totalCredit).toLocaleString()} BDT
                   {isBalanced && ' (Balanced)'}
                 </Typography>
               </Grid>
